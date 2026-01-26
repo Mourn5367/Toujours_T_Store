@@ -1,0 +1,2393 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VIP 부품 교체 대시보드 v6</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&icon_names=undo">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        /* ---------- Theme tokens ---------- */
+        :root {
+            --bg: #f3f1ec;
+            --ink: #1f2a2e;
+            --muted: #6b6f72;
+            --accent: #d6623a;
+            --accent-2: #1b6b6f;
+            --card: #ffffff;
+            --line: #e3ddd4;
+            --soft: #faf7f2;
+        }
+
+        /* ---------- Base reset ---------- */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        /* ---------- Page foundation ---------- */
+        body {
+            font-family: "Pretendard", "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif;
+            background: radial-gradient(circle at top, #fdf8ef, #efe9df);
+            color: var(--ink);
+            min-height: 100vh;
+        }
+
+        /* ---------- Layout container ---------- */
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 40px 24px 72px;
+        }
+
+        /* ---------- Screen routing (store list vs dashboard) ---------- */
+        .screen {
+            display: none;
+        }
+
+        .screen.active {
+            display: block;
+            animation: fadeIn 0.35s ease;
+        }
+
+        /* ---------- Typography ---------- */
+        .title {
+            font-size: 2.1rem;
+            letter-spacing: -0.5px;
+        }
+
+        .subtitle {
+            margin-top: 8px;
+            color: var(--muted);
+            font-size: 1rem;
+        }
+
+        /* ---------- Store selection cards ---------- */
+        .store-grid {
+            margin-top: 28px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+            gap: 16px;
+        }
+
+        .store-card {
+            background: var(--card);
+            border: 1px solid var(--line);
+            border-radius: 16px;
+            padding: 18px;
+            min-height: 120px;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .store-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(32, 23, 8, 0.12);
+        }
+
+        .store-card span {
+            font-weight: 700;
+            font-size: 1.05rem;
+        }
+
+        .store-card small {
+            color: var(--muted);
+            font-size: 0.85rem;
+        }
+
+        /* ---------- File uploader ---------- */
+        .file-upload {
+            margin-top: 20px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .file-upload label {
+            background: var(--accent);
+            color: #fff;
+            padding: 10px 16px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.95rem;
+        }
+
+        .file-upload input {
+            display: none;
+        }
+
+        .file-name {
+            color: var(--muted);
+            font-size: 0.9rem;
+        }
+
+        /* ---------- Dashboard header ---------- */
+        .topbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .back-btn {
+            border: 1px solid var(--line);
+            background: var(--card);
+            padding: 8px 14px;
+            border-radius: 999px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        /* ---------- Summary stats ---------- */
+        .stats-row {
+            display: flex;
+            gap: 16px;
+            margin-bottom: 32px;
+            flex-wrap: wrap;
+        }
+
+        .stat-box {
+            flex: 1;
+            min-width: 200px;
+            background: var(--card);
+            border: 1px solid var(--line);
+            border-radius: 16px;
+            padding: 24px;
+            text-align: center;
+            box-shadow: 0 6px 18px rgba(24, 16, 6, 0.08);
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .stat-box.active {
+            border-color: var(--accent);
+            border-width: 2.5px; /* 여기 숫자를 2~4px 정도로 조절 */
+            box-shadow: 0 8px 22px rgba(50, 96, 76, 0.18);
+        }
+
+        .stat-box:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 24px rgba(24, 16, 6, 0.12);
+        }
+
+        .stat-label {
+            font-size: 0.95rem;
+            color: var(--muted);
+            margin-bottom: 8px;
+        }
+
+        .stat-number {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--accent);
+        }
+
+        /* ---------- Product cards ---------- */
+        .product-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 18px;
+        }
+
+        .product-card {
+            background: var(--card);
+            border: 1px solid var(--line);
+            border-radius: 18px;
+            padding: 20px;
+            box-shadow: 0 6px 18px rgba(24, 16, 6, 0.08);
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .product-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 12px 30px rgba(32, 23, 8, 0.15);
+        }
+
+        /* ---------- Product image & placeholder ---------- */
+        .product-image {
+            width: 100%;
+            height: 180px;
+            object-fit: cover;
+            border-radius: 12px;
+            margin-bottom: 12px;
+            background: var(--soft);
+        }
+
+        .product-image-placeholder {
+            width: 100%;
+            height: 180px;
+            border-radius: 12px;
+            margin-bottom: 12px;
+            background: linear-gradient(135deg, #f5f5f5 0%, #e8e8e8 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            color: var(--muted);
+            font-size: 0.85rem;
+        }
+
+        .product-image-placeholder svg {
+            width: 48px;
+            height: 48px;
+            margin-bottom: 8px;
+            opacity: 0.5;
+        }
+
+        .product-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+            margin-bottom: 12px;
+            gap: 12px;
+        }
+
+        .product-name {
+            font-size: 1.15rem;
+            font-weight: 700;
+            flex: 1;
+        }
+
+        .badge {
+            background: var(--accent);
+            color: white;
+            padding: 6px 12px;
+            border-radius: 999px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        .badge.info {
+            background: #3b82f6;
+        }
+
+        .product-meta {
+            color: var(--muted);
+            font-size: 0.85rem;
+            margin-bottom: 8px;
+        }
+
+        .product-info-line {
+            font-size: 0.85rem;
+            color: var(--muted);
+            margin-top: 4px;
+            margin-bottom: 8px;
+        }
+
+        .product-stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            padding-top: 12px;
+            border-top: 1px solid var(--line);
+        }
+
+        .product-stat {
+            font-size: 0.9rem;
+            color: var(--muted);
+        }
+
+        .product-stat strong {
+            display: block;
+            font-size: 1.3rem;
+            color: var(--accent);
+            margin-top: 4px;
+        }
+
+        /* ---------- Modal ---------- */
+        .modal {
+            position: fixed;
+            inset: 0;
+            background: rgba(26, 22, 16, 0.45);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+            z-index: 20;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: #fff;
+            max-width: 850px;
+            width: 100%;
+            border-radius: 18px;
+            padding: 24px;
+            max-height: 82vh;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 16px;
+            border-bottom: 2px solid var(--line);
+        }
+
+        .modal-title {
+            font-size: 1.4rem;
+            font-weight: 700;
+        }
+
+        .modal-subtitle {
+            color: var(--muted);
+            font-size: 0.9rem;
+            margin-top: 4px;
+        }
+
+        .modal-info-row {
+            display: flex;
+            gap: 24px;
+            margin-top: 8px;
+            flex-wrap: wrap;
+        }
+
+        .modal-info-item {
+            font-size: 0.95rem;
+            color: var(--ink);
+        }
+
+        .modal-info-item span {
+            color: var(--muted);
+            margin-right: 6px;
+        }
+
+        .close-btn {
+            border: none;
+            background: var(--soft);
+            padding: 8px 16px;
+            border-radius: 999px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        /* ---------- Detail content ---------- */
+        .detail-info {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .detail-grid {
+            display: grid;
+            grid-template-columns: minmax(320px, 980px);
+            gap: 20px;
+            justify-content: center;
+        }
+
+        .detail-image-card {
+            background: var(--soft);
+            border: 1px solid var(--line);
+            border-radius: 16px;
+            padding: 12px;
+            display: flex;
+            justify-content: center;
+            width: 100%;
+            margin: 0 auto;
+        }
+
+        .detail-image-wrap {
+            position: relative;
+            border-radius: 14px;
+            overflow: visible;
+            background: #fff;
+            padding: 16px;
+            width: 820px;
+            height: 600px;
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            --canvas-scale: 1;
+        }
+
+        .detail-image-scroll {
+            width: 100%;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .detail-image {
+            width: 100%;
+            height: 100%;
+            display: block;
+            background: #fff;
+            border-radius: 10px;
+            object-fit: contain;
+            max-width: 100%;
+            max-height: 100%;
+        }
+
+        .marker {
+            position: absolute;
+            transform: translate(-50%, -50%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 12px;
+            background: rgba(255, 255, 255, 0.92);
+            border: 1px solid var(--line);
+            border-radius: 999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--ink);
+            box-shadow: 0 6px 18px rgba(24, 16, 6, 0.08);
+            white-space: nowrap;
+            cursor: pointer;
+            text-align: center;
+            transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+        }
+
+        .marker-label {
+            display: flex;
+            align-items: baseline;
+            gap: 8px;
+            justify-content: center;
+        }
+
+        .marker-percent {
+            font-size: 0.7rem;
+            font-weight: 700;
+        }
+
+        .marker-gauge {
+            width: 120px;
+            height: 6px;
+            background: #eee5d9;
+            border-radius: 999px;
+            overflow: hidden;
+        }
+
+        .marker-gauge-fill {
+            display: block;
+            height: 100%;
+            background: linear-gradient(90deg, #f2b166, #d6623a);
+            transition: width 0.2s ease;
+        }
+
+        .marker:hover {
+            transform: translate(-50%, -50%) scale(1.03);
+            border-color: #e0c9b6;
+            box-shadow: 0 12px 28px rgba(24, 16, 6, 0.16);
+        }
+
+        .part-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .part-card {
+            border: 1px solid var(--line);
+            border-radius: 12px;
+            padding: 12px;
+            background: #fff;
+        }
+
+        .part-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            gap: 10px;
+        }
+
+        .part-name {
+            font-size: 0.95rem;
+            font-weight: 700;
+        }
+
+        .part-code {
+            font-size: 0.75rem;
+            color: var(--muted);
+        }
+
+        .life-bar {
+            height: 8px;
+            background: #eee5d9;
+            border-radius: 999px;
+            overflow: hidden;
+            margin-top: 8px;
+        }
+
+        .life-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #f2b166, #d6623a);
+            border-radius: 999px;
+        }
+
+        .life-meta {
+            margin-top: 6px;
+            font-size: 0.75rem;
+            color: var(--muted);
+        }
+
+        .detail-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: #fff;
+            border: 1px solid var(--line);
+            border-radius: 12px;
+            overflow: hidden;
+            table-layout: fixed;
+        }
+
+        .detail-table th,
+        .detail-table td {
+            padding: 10px 12px;
+            border-bottom: 1px solid var(--line);
+            font-size: 0.85rem;
+            text-align: left;
+            word-break: break-word;
+        }
+
+        .detail-table th {
+            background: var(--soft);
+            color: var(--muted);
+            font-weight: 600;
+        }
+
+        .detail-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .info-item {
+            border: 1px solid var(--line);
+            border-radius: 12px;
+            padding: 16px;
+            background: var(--soft);
+        }
+
+        .info-label {
+            font-size: 0.85rem;
+            color: var(--muted);
+            margin-bottom: 6px;
+        }
+
+        .info-value {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: var(--ink);
+        }
+
+        .notice-message {
+            margin-top: 16px;
+            padding: 16px;
+            background: #fef3c7;
+            border: 1px solid #fbbf24;
+            border-radius: 12px;
+            color: #92400e;
+            font-size: 0.9rem;
+            text-align: center;
+        }
+
+        /* ---------- Motion ---------- */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(6px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @media (max-width: 720px) {
+            .container {
+                padding: 28px 20px 60px;
+            }
+            .stats-row {
+                flex-direction: column;
+            }
+            .stat-box {
+                padding: 18px;
+            }
+            .product-grid {
+                grid-template-columns: 1fr;
+                gap: 14px;
+            }
+            .detail-grid {
+                grid-template-columns: 1fr;
+            }
+            .title {
+                font-size: 1.6rem;
+            }
+            .subtitle {
+                font-size: 0.95rem;
+            }
+            .product-name {
+                font-size: 1.1rem;
+            }
+            .product-image {
+                height: 180px;
+                object-fit: cover;
+            }
+            .product-image-placeholder {
+                height: 180px;
+            }
+            .detail-table th,
+            .detail-table td,
+            .parts-table th,
+            .parts-table td {
+                padding: 8px 10px;
+                font-size: 0.8rem;
+            }
+            .event-item {
+                padding: 16px;
+            }
+        }
+
+        .meta {
+            font-size: 0.85rem;
+            color: var(--muted);
+        }
+
+        /* ---------- 모달 탭 스타일 ---------- */
+        /* 모달 메인 탭 (제품 정보 / 수리/교체 내역) */
+        .modal-main-tabs {
+            display: flex;
+            border-bottom: 2px solid var(--line);
+            margin-bottom: 20px;
+            gap: 8px;
+            align-items: stretch;
+        }
+
+        .modal-main-tab {
+            flex: 1;
+            padding: 14px 20px;
+            border: none;
+            background: transparent;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--muted);
+            transition: all 0.2s;
+            border-bottom: 3px solid transparent;
+            margin-bottom: -2px;
+        }
+
+        .modal-main-tab.active {
+            color: var(--accent);
+            border-bottom-color: var(--accent);
+        }
+
+        .modal-main-tab:hover {
+            background: rgba(99, 102, 241, 0.05);
+        }
+
+        /* T자 모양 수리/교체 내역 탭 그룹 */
+        .repair-tab-group {
+            flex: 1;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            border-bottom: none;
+            margin-bottom: -2px;
+            position: relative;
+        }
+
+        /* active 상태일 때 하단 border (::after로 반쪽만 표시) */
+        .repair-tab-group.active::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            height: 3px;
+            background: var(--accent);
+            width: 50%;
+            transition: left 0.3s ease;
+        }
+
+        /* 접수번호별 선택 시 왼쪽 절반 */
+        .repair-tab-group.active[data-active-tab="receipt"]::after {
+            left: 0;
+        }
+
+        /* 부품별 선택 시 오른쪽 절반 */
+        .repair-tab-group.active[data-active-tab="part"]::after {
+            left: 50%;
+        }
+
+        .repair-tab-group.active .repair-tab-header {
+            color: var(--accent);
+        }
+
+        .repair-tab-header {
+            padding: 10px 20px;
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--muted);
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: center;
+            border-bottom: 1px solid var(--line);
+        }
+
+        .repair-tab-header:hover {
+            background: rgba(99, 102, 241, 0.05);
+        }
+
+        .repair-tab-subtabs {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            padding: 0;
+            background: transparent;
+        }
+
+        .repair-subtab-btn {
+            padding: 8px 12px;
+            border: none;
+            background: transparent;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 500;
+            color: var(--muted);
+            transition: all 0.2s;
+            text-align: center;
+        }
+
+        .repair-subtab-btn:first-child {
+            border-right: 1px solid var(--line);
+        }
+
+        .repair-subtab-btn.active {
+            color: var(--accent);
+            font-weight: 600;
+        }
+
+        .repair-subtab-btn:hover {
+            color: var(--accent);
+        }
+
+        /* 탭 컨텐츠 */
+        .modal-tab-content {
+            display: none;
+        }
+
+        .modal-tab-content.active {
+            display: block;
+            animation: fadeIn 0.3s ease;
+        }
+
+        /* 하위 탭 컨텐츠 */
+        .sub-tab-content {
+            display: none;
+        }
+
+        .sub-tab-content.active {
+            display: block;
+        }
+
+        /* 접수번호별 / 부품별 뷰 공통 스타일 */
+        .event-item {
+            border: 1px solid var(--line);
+            border-radius: 10px;
+            padding: 16px;
+            margin-bottom: 12px;
+            background: white;
+        }
+
+        .table-scroll {
+            width: 100%;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .table-scroll .detail-table,
+        .table-scroll .parts-table {
+            min-width: 520px;
+        }
+
+        .event-header {
+            font-size: 1.05rem;
+            font-weight: 700;
+            margin-bottom: 8px;
+            color: var(--ink);
+        }
+
+        .event-meta {
+            font-size: 0.85rem;
+            color: var(--muted);
+            margin-bottom: 12px;
+        }
+
+        .parts-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 12px 0;
+        }
+
+        .parts-table th,
+        .parts-table td {
+            padding: 10px;
+            text-align: left;
+            border-bottom: 1px solid var(--line);
+            font-size: 0.9rem;
+        }
+
+        .parts-table th {
+            background: var(--soft);
+            font-weight: 600;
+            color: var(--ink);
+        }
+
+        .fee-summary {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            margin-top: 12px;
+            padding: 12px;
+            background: #fef3c7;
+            border-radius: 8px;
+            font-size: 0.9rem;
+        }
+
+        .fee-total {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: #92400e;
+        }
+
+        .empty-message {
+            text-align: center;
+            padding: 40px 20px;
+            color: var(--muted);
+            font-size: 0.95rem;
+        }
+
+        .floating-home-btn {
+            position: fixed;
+            right: 6vh;
+            bottom: 7vh;
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            border: none;
+            background: #fff;
+            color: var(--ink);
+            font-size: 1.4rem;
+            box-shadow: 0 12px 28px rgba(22, 15, 6, 0.18);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            pointer-events: none;
+            transform: translateY(10px);
+            transition: opacity 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+            z-index: 12;
+        }
+
+        .material-symbols-outlined {
+            font-variation-settings: "FILL" 0, "wght" 500, "GRAD" 0, "opsz" 24;
+        }
+
+        .floating-home-btn.active {
+            opacity: 1;
+            pointer-events: auto;
+            transform: translateY(0);
+        }
+
+        .floating-home-btn:hover {
+            box-shadow: 0 16px 36px rgba(22, 15, 6, 0.24);
+        }
+
+        @media (max-width: 640px) {
+            .floating-home-btn {
+                right: 2vh;
+                bottom: 2vh;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- 매장 선택 화면 -->
+    <section id="storeScreen" class="screen active">
+        <div class="container">
+            <h1 class="title">매장을 선택해주세요</h1>
+            <p class="subtitle">선택한 매장 기준으로 제품 상태와 설치일을 보여줍니다.</p>
+            <div class="store-grid" id="storeGrid"></div>
+        </div>
+    </section>
+
+    <!-- 대시보드 화면 -->
+    <section id="dashboardScreen" class="screen">
+        <div class="container">
+            <div class="topbar">
+                <div>
+                    <h1 class="title" id="storeTitle">매장</h1>
+                    <p class="subtitle">설치일 오래된 제품부터 표시됩니다</p>
+                </div>
+            </div>
+
+            <div style="margin-bottom: 20px;">
+                <select id="productGroupSelect" style="width: 100%; max-width: 300px; padding: 10px; border: 1px solid var(--line); border-radius: 10px; font-size: 0.95rem; background: #fff; margin-top: 8px;">
+                    <option value="">전체 제품군</option>
+                </select>
+            </div>
+
+            <div class="stats-row">
+                <div class="stat-box" id="statAllCard">
+                    <div class="stat-label">전체 제품</div>
+                    <div class="stat-number" id="countAllProducts">0개</div>
+                </div>
+                <div class="stat-box" id="statReplaceCard">
+                    <div class="stat-label">교체 필요 제품</div>
+                    <div class="stat-number" id="countReplaceProducts">0개</div>
+                </div>
+                <div class="stat-box" id="statCheckCard">
+                    <div class="stat-label">점검 필요 제품</div>
+                    <div class="stat-number" id="countCheckProducts">0개</div>
+                </div>
+            </div>
+
+            <h2 style="font-size: 1.4rem; margin-bottom: 20px;">제품 목록</h2>
+            <div class="product-grid" id="productGrid"></div>
+        </div>
+    </section>
+
+    <!-- 제품 상세 모달 -->
+    <div class="modal" id="detailModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div>
+                    <div class="modal-title" id="detailTitle">제품명</div>
+                    <div class="modal-subtitle" id="detailSubtitle">제품 상세 정보</div>
+                </div>
+                <button class="close-btn" id="modalClose">닫기</button>
+            </div>
+            <div class="detail-info" id="detailInfo"></div>
+        </div>
+    </div>
+
+    <button class="floating-home-btn" id="backBtn" aria-label="홈으로 돌아가기" title="홈으로">
+        <span class="material-symbols-outlined" aria-hidden="true">undo</span>
+    </button>
+
+    <script>
+        // 엑셀 컬럼명 키 (시트 헤더와 정확히 일치해야 함)
+        const KEY_STORE = '매장명';
+        const KEY_LOCATION = '제품위치';
+        const KEY_PRODUCT_NAME = '제품명';
+        const KEY_GROUP = '제품군';
+        const KEY_INSTALL_DATE = '설치일(출고일)';
+        const KEY_MGR = '관리번호';
+        const KEY_SERIAL = '제조번호';
+        const KEY_NOTE = '비고';
+
+        // 이벤트로그 컬럼 키
+        const EVENT_LOG_KEYS = {
+            SHEET_NAME: '시트명',
+            INSTALL_DATE: '설치일',
+            SERIAL: '제조번호',
+            STORE: '매장명',
+            LOCATION: '제품위치',
+            GROUP: '제품군',
+            PRODUCT_NAME: '제품명',
+            MGR_NUMBER: '관리번호',
+            RECEIPT_DATE: '접수일시',
+            RECEIPT_NUMBER: '접수번호',
+            ZONE: '칸구분',
+            RECEIPT_CONTENT: '접수내용',
+            PROCESS_CONTENT: '처리내용',
+            PROCESSOR: '처리자',
+            PART_CODE: '사용부품코드',
+            PART_NAME: '사용부품명',
+            QUANTITY: '수량',
+            PART_FEE: '부품비',
+            TECH_FEE: '기술료',
+            TRAVEL_FEE: '출장비',
+            USAGE_ENV: '사용환경',
+            ETC: '기타'
+        };
+
+        // 런타임 상태
+        let allData = []; // 엑셀에서 읽은 전체 원본 데이터
+        let imageData = new Map(); // 관리번호 → {imageUrl, store}
+        let diagramImageData = []; // 제품 도면 이미지 목록
+        let productMarkersData = []; // 제품별 마커 데이터 목록
+        let eventLogData = []; // 전체 이벤트로그 (117개)
+        let eventLogByMgr = new Map(); // 관리번호별 그룹화
+        let selectedStore = '';
+        let currentStatusFilter = 'all';
+        let currentProduct = null;
+        const EDITOR_BASE_WIDTH = 820;
+        const EDITOR_BASE_HEIGHT = 600;
+
+        function setFileNameText(text) {
+            const el = document.getElementById('fileName');
+            if (el) el.textContent = text;
+        }
+        // 제품명으로 마커 데이터 가져오기
+        function getProductMarkers(productName) {
+            // JSON에서 제품명이 일치하는 항목 찾기
+            const productData = productMarkersData.find(p => {
+                const jsonProductNames = p['제품명'];
+
+                // 정확히 일치하는 경우
+                if (jsonProductNames === productName) {
+                    return true;
+                }
+
+                // 쉼표로 구분된 여러 제품명 중 하나와 일치하는 경우
+                const nameList = jsonProductNames.split(',').map(name => name.trim());
+                return nameList.includes(productName);
+            });
+
+            if (productData && Array.isArray(productData['마커']) && productData['마커'].length > 0) {
+                console.log(`마커 데이터 매칭 성공: ${productName} → ${productData['제품명']}`);
+                return productData['마커'];
+            }
+
+            // 기본 마커 (마커 데이터가 없는 경우)
+            console.log(`마커 데이터 없음, 기본 마커 사용: ${productName}`);
+            return [
+                { id: 1, name: '터치스크린 제어 패널', code: 'HDC-TS-01', life: 82, last: '2024-11-05', marker: { x: 62, y: 10 }, direction: 'bottom', lineLength: 40 },
+                { id: 2, name: '환기/냉각 팬', code: 'HDC-FN-07', life: 64, last: '2024-08-18', marker: { x: 90, y: 18 }, direction: 'bottom', lineLength: 40 },
+                { id: 3, name: '상단 챔버 히터', code: 'HDC-HT-02', life: 48, last: '2024-06-02', marker: { x: 70, y: 42 }, direction: 'bottom', lineLength: 40 },
+                { id: 4, name: '하단 도어 핸들', code: 'HDC-HN-03', life: 90, last: '2025-01-10', marker: { x: 20, y: 62 }, direction: 'bottom', lineLength: 40 },
+                { id: 5, name: '멀티 트레이 레일', code: 'HDC-RL-05', life: 58, last: '2024-05-20', marker: { x: 76, y: 78 }, direction: 'bottom', lineLength: 40 }
+            ];
+        }
+
+        function getLastByPartCode(mgrNumber) {
+            const events = eventLogByMgr.get(mgrNumber) || [];
+            const lastByPartCode = new Map();
+            events.forEach(event => {
+                const partCode = event[EVENT_LOG_KEYS.PART_CODE];
+                const receiptDate = event[EVENT_LOG_KEYS.RECEIPT_DATE];
+                if (!partCode || !receiptDate) return;
+                if (!lastByPartCode.has(partCode)) {
+                    lastByPartCode.set(partCode, receiptDate);
+                    return;
+                }
+                const current = new Date(lastByPartCode.get(partCode));
+                const next = new Date(receiptDate);
+                if (next > current) {
+                    lastByPartCode.set(partCode, receiptDate);
+                }
+            });
+            return lastByPartCode;
+        }
+
+        function getProductPartCounts(product) {
+            const parts = getProductMarkers(product.productName) || [];
+            const lastByPartCode = getLastByPartCode(product.mgr);
+            let replaceCount = 0;
+            let checkCount = 0;
+
+            parts.forEach(part => {
+                const lastDate = lastByPartCode.get(part.code) || product.installDate || part.last;
+                const lifePercent = calculateLifePercent(part.recommendedYears, lastDate);
+                const life = lifePercent ?? part.life ?? 0;
+                if (life < 35) {
+                    replaceCount += 1;
+                } else if (life <= 55) {
+                    checkCount += 1;
+                }
+            });
+
+            return { replaceCount, checkCount };
+        }
+
+        function buildProductList(data) {
+            const productMap = new Map();
+
+            data.forEach(item => {
+                const key = getProductKey(item);
+                if (!productMap.has(key)) {
+                    const elapsedDays = calculateElapsedDays(item[KEY_INSTALL_DATE]);
+                    const imageUrl = getProductImage(item);
+                    const product = {
+                        key,
+                        name: getProductName(item),
+                        subtitle: getProductSubtitle(item),
+                        productName: item[KEY_PRODUCT_NAME] || '-',
+                        productGroup: item[KEY_GROUP] || '-',
+                        location: item[KEY_LOCATION] || '-',
+                        mgr: item[KEY_MGR] || '-',
+                        serial: item[KEY_SERIAL] || '정보 없음',
+                        installDate: item[KEY_INSTALL_DATE] || '-',
+                        note: item[KEY_NOTE] || '',
+                        elapsedDays,
+                        imageUrl,
+                        item
+                    };
+                    const counts = getProductPartCounts(product);
+                    product.replaceCount = counts.replaceCount;
+                    product.checkCount = counts.checkCount;
+                    productMap.set(key, product);
+                }
+            });
+
+            return [...productMap.values()].sort((a, b) => b.elapsedDays - a.elapsedDays);
+        }
+
+        function applyStatusFilter(products) {
+            if (currentStatusFilter === 'replace') {
+                return products.filter(item => item.replaceCount >= 3);
+            }
+            if (currentStatusFilter === 'check') {
+                return products.filter(item => item.checkCount >= 3);
+            }
+            return products;
+        }
+
+        // 일수 → 사람이 읽기 쉬운 기간 문자열
+        function formatDuration(days) {
+            // 365일 = 1년, 30일 = 1개월 기준의 단순 환산
+            const totalDays = Math.max(Math.floor(days || 0), 0);
+            const years = Math.floor(totalDays / 365);
+            const months = Math.floor((totalDays % 365) / 30);
+            const remainingDays = totalDays % 30;
+            const parts = [];
+
+            if (years > 0) {
+                parts.push(`${years}년`);
+            }
+            if (months > 0 || years > 0) {
+                parts.push(`${months}개월`);
+            }
+            parts.push(`${remainingDays}일`);
+
+            return parts.join(' ');
+        }
+
+        // 날짜 문자열 → "YYYY년 M월 D일" 포맷
+        function formatDate(dateStr) {
+            if (!dateStr || dateStr === '-') return '-';
+
+            // "2023-09-15" → "2023년 / 9월 / 15일"
+            const date = new Date(dateStr);
+            if (isNaN(date.getTime())) return dateStr; // 유효하지 않은 날짜면 원본 반환
+
+            const year = date.getFullYear();
+            const month = date.getMonth() + 1;
+            const day = date.getDate();
+
+            return `${year}년 ${month}월 ${day}일`;
+        }
+
+        // 경과 일수를 "N년 N개월 N일" 형식으로 변환
+        function formatInterval(days) {
+            const years = Math.floor(days / 365);
+            const months = Math.floor((days % 365) / 30);
+            const remainingDays = days % 30;
+
+            let result = '';
+            if (years > 0) result += `${years}년 `;
+            if (months > 0) result += `${months}개월 `;
+            if (remainingDays > 0 || result === '') result += `${remainingDays}일`;
+
+            return result.trim();
+        }
+
+        // 쉼표 제거 후 숫자 변환
+        function parseNumber(value) {
+            if (!value) return 0;
+            const str = String(value).replace(/,/g, '');  // 쉼표 제거
+            const num = parseFloat(str);
+            return isNaN(num) ? 0 : num;
+        }
+
+        // 금액 포맷 (쉼표 추가)
+        function formatCurrency(amount) {
+            const num = parseNumber(amount);
+            return Math.round(num).toLocaleString('ko-KR');
+        }
+
+        // 총 비용 계산
+        function calculateTotalFee(items) {
+            let total = 0;
+            items.forEach(item => {
+                const partFee = parseNumber(item[EVENT_LOG_KEYS.PART_FEE]);
+                total += partFee;
+            });
+            const techFee = parseNumber(items[0][EVENT_LOG_KEYS.TECH_FEE]);
+            const travelFee = parseNumber(items[0][EVENT_LOG_KEYS.TRAVEL_FEE]);
+            total += techFee + travelFee;
+            return total;
+        }
+
+        function calculatePartFeeTotal(items) {
+            let total = 0;
+            items.forEach(item => {
+                total += parseNumber(item[EVENT_LOG_KEYS.PART_FEE]);
+            });
+            return total;
+        }
+
+        // 접수번호별로 이벤트 그룹화
+        function groupEventsByReceipt(mgrNumber) {
+            const events = eventLogByMgr.get(mgrNumber) || [];
+            const grouped = new Map(); // 접수번호 → 이벤트 배열
+
+            events.forEach(event => {
+                const receiptNum = event[EVENT_LOG_KEYS.RECEIPT_NUMBER];
+                if (!grouped.has(receiptNum)) {
+                    grouped.set(receiptNum, []);
+                }
+                grouped.get(receiptNum).push(event);
+            });
+
+            const result = Array.from(grouped.entries()).map(([receiptNum, items]) => {
+                const techFee = parseNumber(items[0][EVENT_LOG_KEYS.TECH_FEE]);
+                const travelFee = parseNumber(items[0][EVENT_LOG_KEYS.TRAVEL_FEE]);
+                const partFeeTotal = calculatePartFeeTotal(items);
+                const totalFee = calculateTotalFee(items);
+
+                console.log(`접수번호 ${receiptNum}: 기술료=${techFee}, 출장비=${travelFee}, 총비용=${totalFee}`);
+
+                return {
+                    receiptNumber: receiptNum,
+                    receiptDate: items[0][EVENT_LOG_KEYS.RECEIPT_DATE],
+                    processor: items[0][EVENT_LOG_KEYS.PROCESSOR],
+                    zone: items[0][EVENT_LOG_KEYS.ZONE],
+                    receiptContent: items[0][EVENT_LOG_KEYS.RECEIPT_CONTENT],
+                    processContent: items[0][EVENT_LOG_KEYS.PROCESS_CONTENT],
+                    parts: items.map(item => {
+                        const partFee = parseNumber(item[EVENT_LOG_KEYS.PART_FEE]);
+                        console.log(`  - ${item[EVENT_LOG_KEYS.PART_NAME]}: 부품비=${partFee}`);
+                        return {
+                            partCode: item[EVENT_LOG_KEYS.PART_CODE],
+                            partName: item[EVENT_LOG_KEYS.PART_NAME],
+                            quantity: item[EVENT_LOG_KEYS.QUANTITY],
+                            partFee: partFee
+                        };
+                    }),
+                    techFee: techFee,
+                    travelFee: travelFee,
+                    partFeeTotal: partFeeTotal,
+                    totalFee: totalFee
+                };
+            });
+
+            return result;
+        }
+
+        // 부품별로 이벤트 그룹화 및 주기 계산
+        function groupEventsByPart(mgrNumber, installDate) {
+            const events = eventLogByMgr.get(mgrNumber) || [];
+            const grouped = new Map(); // 부품코드 → 이벤트 배열
+
+            events.forEach(event => {
+                const partCode = event[EVENT_LOG_KEYS.PART_CODE];
+                if (!partCode) return; // 부품코드 없는 항목 스킵
+
+                if (!grouped.has(partCode)) {
+                    grouped.set(partCode, {
+                        partName: event[EVENT_LOG_KEYS.PART_NAME],
+                        events: []
+                    });
+                }
+                grouped.get(partCode).events.push(event);
+            });
+
+            // 각 부품별로 교체 주기 계산
+            const result = [];
+            grouped.forEach((data, partCode) => {
+                // 접수일시 오름차순 정렬 (오래된 것부터)
+                data.events.sort((a, b) => {
+                    const dateA = new Date(a[EVENT_LOG_KEYS.RECEIPT_DATE]);
+                    const dateB = new Date(b[EVENT_LOG_KEYS.RECEIPT_DATE]);
+                    return dateA - dateB;
+                });
+
+                // 각 교체 이벤트에 경과기간 계산
+                const eventsWithInterval = data.events.map((event, index) => {
+                    let previousDate;
+                    if (index === 0) {
+                        // 첫 교체: 설치일 기준
+                        previousDate = new Date(installDate);
+                    } else {
+                        // 이후 교체: 직전 교체일 기준
+                        previousDate = new Date(data.events[index - 1][EVENT_LOG_KEYS.RECEIPT_DATE]);
+                    }
+
+                    const currentDate = new Date(event[EVENT_LOG_KEYS.RECEIPT_DATE]);
+                    const intervalDays = Math.floor((currentDate - previousDate) / (1000 * 60 * 60 * 24));
+
+                    return {
+                        receiptDate: event[EVENT_LOG_KEYS.RECEIPT_DATE],
+                        intervalDays: intervalDays,
+                        intervalText: formatInterval(intervalDays),
+                        processor: event[EVENT_LOG_KEYS.PROCESSOR],
+                        receiptNumber: event[EVENT_LOG_KEYS.RECEIPT_NUMBER],
+                        zone: event[EVENT_LOG_KEYS.ZONE],
+                        partFee: parseNumber(event[EVENT_LOG_KEYS.PART_FEE]),
+                        quantity: event[EVENT_LOG_KEYS.QUANTITY],
+                        receiptContent: event[EVENT_LOG_KEYS.RECEIPT_CONTENT],
+                        processContent: event[EVENT_LOG_KEYS.PROCESS_CONTENT],
+                        isFirstReplace: index === 0
+                    };
+                });
+
+                // 평균 교체 주기 계산
+                const avgInterval = eventsWithInterval.length > 0
+                    ? Math.floor(eventsWithInterval.reduce((sum, e) => sum + e.intervalDays, 0) / eventsWithInterval.length)
+                    : 0;
+
+                result.push({
+                    partCode: partCode,
+                    partName: data.partName,
+                    events: eventsWithInterval,
+                    avgInterval: avgInterval,
+                    avgIntervalText: formatInterval(avgInterval)
+                });
+            });
+
+            return result;
+        }
+
+        // 설치일 기준 경과일 계산
+        function calculateElapsedDays(installDateStr) {
+            if (!installDateStr) return 0;
+
+            const installDate = new Date(installDateStr);
+            const today = new Date();
+            const diffTime = today - installDate;
+            const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+            return Math.max(diffDays, 0);
+        }
+
+        function calculateLifePercent(recommendedYears, lastDateStr) {
+            const years = parseNumber(recommendedYears);
+            if (!years || !lastDateStr) return null;
+            const lastDate = new Date(lastDateStr);
+            if (isNaN(lastDate.getTime())) return null;
+            const days = Math.floor((new Date() - lastDate) / (1000 * 60 * 60 * 24));
+            const limitDays = years * 365;
+            if (!limitDays) return null;
+            const remaining = Math.max(0, limitDays - Math.max(days, 0));
+            return Math.round((remaining / limitDays) * 100);
+        }
+
+        // 구글 드라이브 링크에서 파일 ID 추출
+        function extractFileId(driveUrl) {
+            if (!driveUrl) return null;
+            // "https://drive.google.com/file/d/FILE_ID/view?usp=drive_link" → FILE_ID
+            const match = driveUrl.match(/\/d\/([^\/]+)/);
+            return match ? match[1] : null;
+        }
+
+        // 관리번호 정규화 (공백/언더바 제거)
+        function normalizeManagerNumber(mgrNumber) {
+            // 공백과 언더바를 모두 제거하여 정규화
+            return (mgrNumber || '').replace(/_/g, '').replace(/ /g, '');
+        }
+
+        // 관리번호로 이미지 URL 조회
+        function getProductImage(item) {
+            const mgrNumber = normalizeManagerNumber(item[KEY_MGR]);
+            const imageInfo = imageData.get(mgrNumber);
+
+            // 디버깅: 처음 5개만 로그
+            if (Math.random() < 0.1) {
+                console.log(`이미지 조회: [${item[KEY_MGR]}] → 정규화: [${mgrNumber}] → ${imageInfo ? 'FOUND' : 'NOT FOUND'}`);
+            }
+
+            if (imageInfo && imageInfo.imageUrl) {
+                return imageInfo.imageUrl;
+            }
+
+            return '';
+        }
+
+        // 제품명/제품군으로 도면 이미지 조회
+        function getDiagramImage(productName, productGroup) {
+            // 1순위: 제품명이 "적용 제품"에 포함되는 이미지 찾기
+            for (const item of diagramImageData) {
+                const applicableProducts = item['적용 제품'] || '';
+                if (applicableProducts.includes(productName)) {
+                    // webp 우선 사용, 없으면 기존 링크 사용
+                    const webpLink = item['이미지 링크_webp'];
+                    const pngLink = item['이미지 링크'];
+                    const driveLink = webpLink || pngLink;
+
+                    console.log(`[도면 이미지] 제품명 매칭: ${productName}`);
+                    console.log(`  - webp 링크: ${webpLink ? '있음' : '없음'}`);
+                    console.log(`  - png 링크: ${pngLink ? '있음' : '없음'}`);
+                    console.log(`  - 선택된 링크: ${webpLink ? 'WEBP' : 'PNG'}`);
+
+                    if (driveLink) {
+                        const fileId = extractFileId(driveLink);
+                        const finalUrl = fileId ? `https://lh3.googleusercontent.com/d/${fileId}` : item['이미지 이름'];
+                        console.log(`  - 최종 URL: ${finalUrl}`);
+                        return finalUrl;
+                    }
+                    return item['이미지 이름'];
+                }
+            }
+
+            // 2순위: 제품군 기본 이미지 찾기
+            for (const item of diagramImageData) {
+                if (item['제품군'] === productGroup && !item['적용 제품']) {
+                    // webp 우선 사용, 없으면 기존 링크 사용
+                    const webpLink = item['이미지 링크_webp'];
+                    const pngLink = item['이미지 링크'];
+                    const driveLink = webpLink || pngLink;
+
+                    console.log(`[도면 이미지] 제품군 매칭: ${productGroup}`);
+                    console.log(`  - webp 링크: ${webpLink ? '있음' : '없음'}`);
+                    console.log(`  - png 링크: ${pngLink ? '있음' : '없음'}`);
+                    console.log(`  - 선택된 링크: ${webpLink ? 'WEBP' : 'PNG'}`);
+
+                    if (driveLink) {
+                        const fileId = extractFileId(driveLink);
+                        const finalUrl = fileId ? `https://lh3.googleusercontent.com/d/${fileId}` : item['이미지 이름'];
+                        console.log(`  - 최종 URL: ${finalUrl}`);
+                        return finalUrl;
+                    }
+                    return item['이미지 이름'];
+                }
+            }
+
+            // 3순위: 기본 이미지
+            console.log(`[도면 이미지] 기본 이미지 사용: HDC.png`);
+            return 'HDC.png';
+        }
+
+        // 이미지 프리로딩 함수
+        async function preloadImages() {
+            const imageUrls = new Set();
+
+            // 1. 카드 썸네일 이미지 URL 수집
+            imageData.forEach(data => {
+                if (data.imageUrl) {
+                    imageUrls.add(data.imageUrl);
+                }
+            });
+
+            // 2. 도면 이미지 URL 수집 (webp 우선)
+            diagramImageData.forEach(item => {
+                const driveLink = item['이미지 링크_webp'] || item['이미지 링크'];
+                if (driveLink) {
+                    const fileId = extractFileId(driveLink);
+                    if (fileId) {
+                        imageUrls.add(`https://lh3.googleusercontent.com/d/${fileId}`);
+                    }
+                }
+            });
+
+            console.log(`이미지 프리로드 시작: ${imageUrls.size}개`);
+            setFileNameText(`이미지 프리로드 중... (${imageUrls.size}개)`);
+
+            // 3. 이미지 프리로드 (Promise.all로 병렬 처리)
+            const promises = Array.from(imageUrls).map(url => {
+                return new Promise((resolve) => {
+                    const img = new Image();
+                    img.onload = () => resolve();
+                    img.onerror = () => resolve(); // 에러가 나도 진행
+                    img.src = url;
+                });
+            });
+
+            await Promise.all(promises);
+            console.log('이미지 프리로드 완료');
+        }
+
+        // 초기 로드: 이미지 JSON + 기본 엑셀 파일
+        async function loadDefaultFile() {
+            try {
+                // 1) 통합 JSON 로드
+                setFileNameText('통합 데이터 로딩 중...');
+                const response = await fetch('index_v6.json');
+                if (!response.ok) {
+                    setFileNameText('index_v6.json 파일을 찾지 못했습니다.');
+                    return;
+                }
+
+                const payload = await response.json();
+
+                const stores = new Map((payload.stores || []).map(item => [item.id, item]));
+                const groups = new Map((payload.product_groups || []).map(item => [item.id, item]));
+                const products = new Map((payload.products || []).map(item => [item.id, item]));
+                const instances = payload.product_instances || [];
+                const instanceImages = payload.product_instance_images || [];
+                const nameImages = payload.product_name_images || [];
+                const partsMaster = new Map((payload.parts_master || []).map(item => [item.mes_code, item]));
+                const receipts = payload.event_receipts || [];
+                const parts = payload.event_parts || [];
+                const markers = payload.product_markers || [];
+                const markerSettings = payload.product_marker_settings || [];
+                const markerScaleByProductId = new Map(
+                    markerSettings.map(item => [item.product_id, Number(item.marker_scale) || 1])
+                );
+
+                // 제품 목록 생성 (엑셀 형식으로 변환)
+                allData = instances.map(instance => {
+                    const store = stores.get(instance.store_id);
+                    const product = products.get(instance.product_id);
+                    const group = product ? groups.get(product.product_group_id) : null;
+                    return {
+                        [KEY_STORE]: store ? store.store_name : '',
+                        [KEY_LOCATION]: instance.location || '',
+                        [KEY_PRODUCT_NAME]: product ? product.product_name : '',
+                        [KEY_GROUP]: group ? group.group_name : '',
+                        [KEY_INSTALL_DATE]: instance.install_date || '',
+                        [KEY_MGR]: instance.mgr_number || '',
+                        [KEY_SERIAL]: instance.serial_number || '',
+                        [KEY_NOTE]: ''
+                    };
+                });
+
+                // 관리번호 → 썸네일 이미지 매핑
+                imageData.clear();
+                const instanceById = new Map(instances.map(item => [item.id, item]));
+                instanceImages.forEach(item => {
+                    const inst = instanceById.get(item.product_instance_id);
+                    if (!inst || !item.image_url) return;
+                    const store = stores.get(inst.store_id);
+                    const normalizedMgr = normalizeManagerNumber(inst.mgr_number);
+                    const fileId = extractFileId(item.image_url);
+                    const finalUrl = fileId ? `https://lh3.googleusercontent.com/d/${fileId}` : item.image_url;
+                    imageData.set(normalizedMgr, {
+                        imageUrl: finalUrl,
+                        store: store ? store.store_name : ''
+                    });
+                });
+
+                // 도면 이미지 데이터 구성
+                diagramImageData = nameImages.map(item => {
+                    const group = groups.get(item.product_group_id);
+                    const product = products.get(item.product_id);
+                    return {
+                        '이미지 이름': item.image_name,
+                        '이미지 링크': item.image_url,
+                        '이미지 링크_webp': item.image_url_webp || '',
+                        '제품군': group ? group.group_name : '',
+                        '적용 제품': product ? product.product_name : ''
+                    };
+                });
+
+                // 제품 마커 데이터 구성
+                const markersByProduct = new Map();
+                markers.forEach(marker => {
+                    const product = products.get(marker.product_id);
+                    if (!product) return;
+                    if (!markersByProduct.has(product.product_name)) {
+                        markersByProduct.set(product.product_name, []);
+                    }
+                    const part = partsMaster.get(marker.mes_code);
+                    const scale = markerScaleByProductId.get(product.id) || 1;
+                    markersByProduct.get(product.product_name).push({
+                        id: marker.id,
+                        name: part ? part.part_name : '부품',
+                        code: marker.mes_code,
+                        life: 50,
+                        last: '',
+                        spec: part ? part.part_spec : '',
+                        recommendedYears: part ? part.recommended_years : '',
+                        marker: { x: marker.x_pos, y: marker.y_pos },
+                        direction: marker.direction || 'bottom',
+                        lineLength: marker.line_length || 40,
+                        scale
+                    });
+                });
+
+                productMarkersData = Array.from(markersByProduct.entries()).map(([productName, list]) => ({
+                    '제품명': productName,
+                    '마커': list
+                }));
+
+                // 이벤트 로그 데이터 구성
+                const receiptById = new Map(receipts.map(item => [item.id, item]));
+                eventLogData = parts.map(partItem => {
+                    const receipt = receiptById.get(partItem.receipt_id);
+                    if (!receipt) return null;
+                    const inst = instanceById.get(receipt.product_instance_id);
+                    const store = inst ? stores.get(inst.store_id) : null;
+                    const product = inst ? products.get(inst.product_id) : null;
+                    const group = product ? groups.get(product.product_group_id) : null;
+
+                    return {
+                        [EVENT_LOG_KEYS.SHEET_NAME]: '',
+                        [EVENT_LOG_KEYS.INSTALL_DATE]: inst ? inst.install_date : '',
+                        [EVENT_LOG_KEYS.SERIAL]: inst ? inst.serial_number : '',
+                        [EVENT_LOG_KEYS.STORE]: store ? store.store_name : '',
+                        [EVENT_LOG_KEYS.LOCATION]: inst ? inst.location : '',
+                        [EVENT_LOG_KEYS.GROUP]: group ? group.group_name : '',
+                        [EVENT_LOG_KEYS.PRODUCT_NAME]: product ? product.product_name : '',
+                        [EVENT_LOG_KEYS.MGR_NUMBER]: inst ? inst.mgr_number : '',
+                        [EVENT_LOG_KEYS.RECEIPT_DATE]: receipt.receipt_date || '',
+                        [EVENT_LOG_KEYS.RECEIPT_NUMBER]: receipt.receipt_number || '',
+                        [EVENT_LOG_KEYS.ZONE]: receipt.zone || '',
+                        [EVENT_LOG_KEYS.RECEIPT_CONTENT]: receipt.receipt_content || '',
+                        [EVENT_LOG_KEYS.PROCESS_CONTENT]: receipt.process_content || '',
+                        [EVENT_LOG_KEYS.PROCESSOR]: receipt.processor || '',
+                        [EVENT_LOG_KEYS.PART_CODE]: partItem.mes_code || '',
+                        [EVENT_LOG_KEYS.PART_NAME]: partItem.part_name || '',
+                        [EVENT_LOG_KEYS.QUANTITY]: partItem.quantity || '',
+                        [EVENT_LOG_KEYS.PART_FEE]: partItem.part_fee || '',
+                        [EVENT_LOG_KEYS.TECH_FEE]: receipt.tech_fee || '',
+                        [EVENT_LOG_KEYS.TRAVEL_FEE]: receipt.travel_fee || '',
+                        [EVENT_LOG_KEYS.USAGE_ENV]: '',
+                        [EVENT_LOG_KEYS.ETC]: ''
+                    };
+                }).filter(Boolean);
+
+                // 관리번호별 그룹화
+                eventLogByMgr.clear();
+                eventLogData.forEach(event => {
+                    const mgrNumber = event[EVENT_LOG_KEYS.MGR_NUMBER];
+                    if (!eventLogByMgr.has(mgrNumber)) {
+                        eventLogByMgr.set(mgrNumber, []);
+                    }
+                    eventLogByMgr.get(mgrNumber).push(event);
+                });
+
+                // 각 관리번호의 이벤트를 접수일시 순으로 정렬 (최신순)
+                eventLogByMgr.forEach((events, mgrNumber) => {
+                    events.sort((a, b) => {
+                        const dateA = new Date(a[EVENT_LOG_KEYS.RECEIPT_DATE]);
+                        const dateB = new Date(b[EVENT_LOG_KEYS.RECEIPT_DATE]);
+                        return dateB - dateA; // 최신순
+                    });
+                });
+
+                // 이미지 프리로드
+                await preloadImages();
+
+                setFileNameText(`index_v6.json (${allData.length}개 제품, ${eventLogData.length}개 이벤트)`);
+                renderStoreCards();
+
+            } catch (error) {
+                setFileNameText('파일 로드 실패');
+                console.error('로드 에러:', error);
+                alert('파일을 로드할 수 없습니다: ' + error.message);
+            }
+        }
+
+        // 제품 식별 키 생성 (중복 제거용)
+        function getProductKey(item) {
+            const location = item[KEY_LOCATION] || '';
+            const mgr = item[KEY_MGR] || '';
+            return `${location}||${mgr}`;
+        }
+
+        // 카드에 표시할 제품명 생성
+        function getProductName(item) {
+            const location = item[KEY_LOCATION] || '-';
+            const mgr = item[KEY_MGR] || '';
+
+            let name = location;
+            if (mgr) name += ` (${mgr})`;
+            return name;
+        }
+
+        // 카드 보조 정보 (제조번호 등)
+        function getProductSubtitle(item) {
+            const serial = item[KEY_SERIAL] || '';
+            const parts = [];
+            if (serial) parts.push(`제조번호: ${serial}`);
+            return parts.join(' · ') || '제조번호 정보 없음';
+        }
+
+        // 업로드 파일 처리
+        function processExcelData(arrayBuffer, fileName) {
+            try {
+                // 업로드된 엑셀에서도 동일 시트명을 찾는다
+                const data = new Uint8Array(arrayBuffer);
+                const workbook = XLSX.read(data, { type: 'array' });
+
+                const sheetName = '뚜쥬르 모든 점포 제품목록';
+                const sheet = workbook.Sheets[sheetName];
+
+                if (!sheet) {
+                    alert(`"${sheetName}" 시트를 찾을 수 없습니다.`);
+                    return;
+                }
+
+                const jsonData = XLSX.utils.sheet_to_json(sheet, { raw: false, dateNF: 'yyyy-mm-dd' });
+                allData = jsonData;
+
+                console.log(`업로드된 파일 로드 완료: ${allData.length}행`);
+                setFileNameText(fileName);
+                renderStoreCards();
+            } catch (error) {
+                setFileNameText('파일 로드 실패');
+                alert('엑셀 파일을 읽을 수 없습니다: ' + error.message);
+            }
+        }
+
+        // 매장 카드 렌더링
+        function renderStoreCards() {
+            const storeGrid = document.getElementById('storeGrid');
+            const stores = [...new Set(allData.map(item => item[KEY_STORE]).filter(Boolean))].sort();
+
+            if (stores.length === 0) {
+                storeGrid.innerHTML = '<p class="meta">데이터에서 매장을 찾을 수 없습니다.</p>';
+                return;
+            }
+
+            storeGrid.innerHTML = '';
+            stores.forEach(store => {
+                const card = document.createElement('div');
+                card.className = 'store-card';
+                card.innerHTML = `<span>${store}</span><small>이 매장 데이터 보기</small>`;
+                card.addEventListener('click', () => selectStore(store));
+                storeGrid.appendChild(card);
+            });
+        }
+
+        // 매장 선택 → 대시보드 전환
+        function selectStore(store) {
+            selectedStore = store;
+            document.getElementById('storeTitle').textContent = store;
+            document.getElementById('storeScreen').classList.remove('active');
+            document.getElementById('dashboardScreen').classList.add('active');
+            document.getElementById('backBtn').classList.add('active');
+            initializeFilters();
+            updateDashboard();
+        }
+
+        // 제품군 필터 초기화
+        function initializeFilters() {
+            const storeData = allData.filter(item => item[KEY_STORE] === selectedStore);
+            const productGroups = [...new Set(storeData.map(item => item[KEY_GROUP]).filter(Boolean))].sort();
+
+            const groupSelect = document.getElementById('productGroupSelect');
+            groupSelect.innerHTML = '<option value="">전체 제품군</option>';
+            productGroups.forEach(group => {
+                const option = document.createElement('option');
+                option.value = group;
+                option.textContent = group;
+                groupSelect.appendChild(option);
+            });
+        }
+
+        // 선택된 필터 적용
+        function applyFilters() {
+            const selectedGroup = document.getElementById('productGroupSelect').value;
+            let data = allData.filter(item => item[KEY_STORE] === selectedStore);
+
+            if (selectedGroup) {
+                data = data.filter(item => item[KEY_GROUP] === selectedGroup);
+            }
+
+            return data;
+        }
+
+        // 대시보드 통계 + 제품 목록 갱신
+        function updateDashboard() {
+            const filteredData = applyFilters();
+            const products = buildProductList(filteredData);
+
+            const totalProducts = products.length;
+            const replaceProducts = products.filter(item => item.replaceCount >= 3).length;
+            const checkProducts = products.filter(item => item.checkCount >= 3).length;
+
+            document.getElementById('countAllProducts').textContent = `${totalProducts}개`;
+            document.getElementById('countReplaceProducts').textContent = `${replaceProducts}개`;
+            document.getElementById('countCheckProducts').textContent = `${checkProducts}개`;
+
+            const displayProducts = applyStatusFilter(products);
+            updateProductGrid(displayProducts);
+
+            document.querySelectorAll('.stat-box').forEach(box => {
+                box.classList.remove('active');
+            });
+            if (currentStatusFilter === 'replace') {
+                document.getElementById('statReplaceCard').classList.add('active');
+            } else if (currentStatusFilter === 'check') {
+                document.getElementById('statCheckCard').classList.add('active');
+            } else {
+                document.getElementById('statAllCard').classList.add('active');
+            }
+        }
+
+        // 제품 카드 리스트 생성
+        function updateProductGrid(products) {
+            const grid = document.getElementById('productGrid');
+            grid.innerHTML = '';
+
+            if (products.length === 0) {
+                grid.innerHTML = '<p class="meta" style="grid-column: 1/-1; text-align: center; padding: 40px;">제품이 없습니다.</p>';
+                return;
+            }
+
+            products.forEach(product => {
+                const card = document.createElement('div');
+                card.className = 'product-card';
+
+                // 이미지가 있으면 img 태그, 없으면 플레이스홀더 카드 사용
+                const imageHtml = product.imageUrl
+                    ? `<img src="${product.imageUrl}" alt="${product.name}" class="product-image" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                       <div class="product-image-placeholder" style="display: none;">
+                           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                               <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                               <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                               <polyline points="21 15 16 10 5 21"></polyline>
+                           </svg>
+                           <span>이미지 없음</span>
+                       </div>`
+                    : `<div class="product-image-placeholder">
+                           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                               <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                               <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                               <polyline points="21 15 16 10 5 21"></polyline>
+                           </svg>
+                           <span>이미지 없음</span>
+                       </div>`;
+
+                card.innerHTML = `
+                    ${imageHtml}
+                    <div class="product-header">
+                        <div class="product-name">${product.name}</div>
+                    </div>
+                    <div class="product-meta">${product.productName}</div>
+                    <div class="product-meta">제품군: ${product.productGroup}</div>
+                    <div class="product-info-line">제조번호: ${product.serial}</div>
+                    <div class="product-info-line">설치일: ${formatDate(product.installDate)}</div>
+                    <div class="product-stats">
+                        <div class="product-stat">
+                            교체 필요 부품
+                            <strong>${product.replaceCount || 0}개</strong>
+                        </div>
+                        <div class="product-stat">
+                            점검 필요 부품
+                            <strong>${product.checkCount || 0}개</strong>
+                        </div>
+                    </div>
+                `;
+
+                card.addEventListener('click', () => openProductDetail(product));
+                grid.appendChild(card);
+            });
+        }
+
+        function getLifeColor(life) {
+            if (life >= 75) return '#1b8f58'; // green
+            if (life >= 55) return '#facc15'; // yellow
+            if (life >= 35) return '#f59e0b'; // orange
+            return '#ef4444'; // red
+        }
+
+        function scrollToPart(code) {
+            const row = document.getElementById(`part-row-${code}`);
+            if (!row) return;
+            row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            row.style.background = '#fff5e6';
+            setTimeout(() => {
+                row.style.background = '';
+            }, 900);
+        }
+
+        function renderProductInfoTab(product) {
+            // 제품명/제품군에 맞는 도면 이미지 가져오기
+            const imageSrc = getDiagramImage(product.productName, product.productGroup);
+            console.log(`도면 이미지 조회: ${product.productName} (${product.productGroup}) → ${imageSrc}`);
+
+            // 제품명에 맞는 마커 데이터 가져오기
+            const demoParts = getProductMarkers(product.productName);
+            console.log(`마커 데이터 조회: ${product.productName} → ${demoParts.length}개 마커`);
+
+            const events = eventLogByMgr.get(product.mgr) || [];
+            const lastByPartCode = new Map();
+            events.forEach(event => {
+                const partCode = event[EVENT_LOG_KEYS.PART_CODE];
+                const receiptDate = event[EVENT_LOG_KEYS.RECEIPT_DATE];
+                if (!partCode || !receiptDate) return;
+                if (!lastByPartCode.has(partCode)) {
+                    lastByPartCode.set(partCode, receiptDate);
+                }
+            });
+
+            const partsWithLast = demoParts.map(part => {
+                const lastDate = lastByPartCode.get(part.code) || product.installDate || part.last;
+                const lifePercent = calculateLifePercent(part.recommendedYears, lastDate);
+                return { ...part, last: lastDate, life: lifePercent ?? part.life };
+            });
+            partsWithLast.sort((a, b) => {
+                const lifeA = a.life ?? 0;
+                const lifeB = b.life ?? 0;
+                if (lifeA !== lifeB) return lifeA - lifeB;
+                const dateA = new Date(a.last || 0).getTime();
+                const dateB = new Date(b.last || 0).getTime();
+                return dateA - dateB;
+            });
+
+            const markersHtml = partsWithLast.map(part => {
+                const color = getLifeColor(part.life);
+                const direction = part.direction || 'bottom';
+                const scale = part.scale || 1;
+                const lineLength = (part.lineLength || 40) * scale;
+                const lineThickness = Math.max(1, 2 * scale);
+                const dotSize = 16 * scale;
+                const dotInset = Math.max(2, 2 * scale);
+
+                // 지시선 스타일
+                let lineStyle = '';
+                let labelStyle = '';
+                const labelOffset = lineLength + 10 * scale;
+                const diagonalLength = lineLength;
+                const diagonalOffset = (lineLength + 10 * scale) / Math.sqrt(2);
+
+                switch(direction) {
+                    case 'top':
+                        lineStyle = `width: ${lineThickness}px; height: ${lineLength}px; left: 50%; bottom: 100%; transform: translateX(-50%);`;
+                        labelStyle = `bottom: ${labelOffset}px; left: 50%; transform: translateX(-50%);`;
+                        break;
+                    case 'bottom':
+                        lineStyle = `width: ${lineThickness}px; height: ${lineLength}px; left: 50%; top: 100%; transform: translateX(-50%);`;
+                        labelStyle = `top: ${labelOffset}px; left: 50%; transform: translateX(-50%);`;
+                        break;
+                    case 'left':
+                        lineStyle = `height: ${lineThickness}px; width: ${lineLength}px; top: 50%; right: 100%; transform: translateY(-50%);`;
+                        labelStyle = `right: ${labelOffset}px; top: 50%; transform: translateY(-50%);`;
+                        break;
+                    case 'right':
+                        lineStyle = `height: ${lineThickness}px; width: ${lineLength}px; top: 50%; left: 100%; transform: translateY(-50%);`;
+                        labelStyle = `left: ${labelOffset}px; top: 50%; transform: translateY(-50%);`;
+                        break;
+                    case 'top-left':
+                        lineStyle = `height: ${lineThickness}px; width: ${diagonalLength}px; left: 50%; top: 50%; transform-origin: 0 50%; transform: translateY(-50%) rotate(-135deg);`;
+                        labelStyle = `left: calc(50% - ${diagonalOffset}px); top: calc(50% - ${diagonalOffset}px); transform: translate(-50%, -50%);`;
+                        break;
+                    case 'top-right':
+                        lineStyle = `height: ${lineThickness}px; width: ${diagonalLength}px; left: 50%; top: 50%; transform-origin: 0 50%; transform: translateY(-50%) rotate(-45deg);`;
+                        labelStyle = `left: calc(50% + ${diagonalOffset}px); top: calc(50% - ${diagonalOffset}px); transform: translate(-50%, -50%);`;
+                        break;
+                    case 'bottom-left':
+                        lineStyle = `height: ${lineThickness}px; width: ${diagonalLength}px; left: 50%; top: 50%; transform-origin: 0 50%; transform: translateY(-50%) rotate(135deg);`;
+                        labelStyle = `left: calc(50% - ${diagonalOffset}px); top: calc(50% + ${diagonalOffset}px); transform: translate(-50%, -50%);`;
+                        break;
+                    case 'bottom-right':
+                        lineStyle = `height: ${lineThickness}px; width: ${diagonalLength}px; left: 50%; top: 50%; transform-origin: 0 50%; transform: translateY(-50%) rotate(45deg);`;
+                        labelStyle = `left: calc(50% + ${diagonalOffset}px); top: calc(50% + ${diagonalOffset}px); transform: translate(-50%, -50%);`;
+                        break;
+                }
+
+                return `
+                    <div class="marker-container" style="position: absolute; left: ${part.marker.x}%; top: ${part.marker.y}%; cursor: pointer; transform: translate(-50%, -50%);" onclick="scrollToPart('${part.code}')">
+                        <div style="transform: scale(var(--canvas-scale, 1)); transform-origin: center;">
+                            <!-- 지시선 -->
+                            <div style="position: absolute; background: rgba(107, 111, 114, 0.6); ${lineStyle}"></div>
+
+                            <!-- 중앙 점 (주황색) -->
+                            <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: ${dotSize}px; height: ${dotSize}px; border-radius: 50%; background: linear-gradient(135deg, ${color}, ${color}); box-shadow: 0 4px 12px rgba(214, 98, 58, 0.4);">
+                                <div style="position: absolute; inset: ${dotInset}px; border-radius: 50%; background: rgba(255, 255, 255, 0.3);"></div>
+                            </div>
+
+                            <!-- 라벨 -->
+                            <div style="position: absolute; white-space: nowrap; ${labelStyle}">
+                                <div style="transform: scale(${scale}); transform-origin: 0 0;">
+                                    <div style="background: white; border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,0.15); padding: 8px 12px;">
+                                        <div style="display: flex; align-items: center; gap: 8px;">
+                                            <span style="color: var(--ink); font-weight: 600; font-size: 0.85rem;">${part.name}</span>
+                                            <span style="color: ${color}; font-weight: 700; font-size: 0.85rem;">${part.life}%</span>
+                                        </div>
+                                        <div style="margin-top: 6px; height: 6px; width: 120px; background: #eee5d9; border-radius: 999px; overflow: hidden;">
+                                            <div style="height: 100%; background: linear-gradient(90deg, #f2b166, ${color}); border-radius: 999px; width: ${Math.min(part.life, 100)}%; transition: width 0.3s;"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            const tableRows = partsWithLast.map(part => `
+                <tr id="part-row-${part.code}">
+                    <td>${part.name}</td>
+                    <td>${part.code}</td>
+                    <td>${formatDate(part.last)}</td>
+                    <td>
+                        <div class="life-bar" style="margin: 0;">
+                            <div class="life-fill" style="width: ${Math.min(part.life, 100)}%; background: ${getLifeColor(part.life)};"></div>
+                        </div>
+                        <div class="life-meta" style="margin-top: 4px;">${part.life}%</div>
+                    </td>
+                </tr>
+            `).join('');
+
+            return `
+                <div class="detail-grid">
+               
+                        <div class="detail-image-scroll">
+                            <div class="detail-image-wrap">
+                                <img class="detail-image" src="${imageSrc}" alt="${product.name}">
+                                ${markersHtml}
+                            </div>
+                        </div>
+                  
+                </div>
+                <div class="table-scroll" style="margin-top: 16px;">
+                <table class="detail-table" id="partTable">
+                    <thead>
+                        <tr>
+                            <th>부품명</th>
+                            <th>부품 코드</th>
+                            <th>마지막 교체일</th>
+                            <th>부품 수명</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${tableRows}
+                    </tbody>
+                </table>
+                </div>
+            `;
+        }
+
+        // 제품 상세 모달 오픈
+        function openProductDetail(product) {
+            currentProduct = product;
+
+            // 모달 제목과 부제목
+            document.getElementById('detailTitle').textContent = product.name;
+            document.getElementById('detailSubtitle').innerHTML = `
+                <div>${product.productName}</div>
+                <div class="modal-info-row">
+                    <div class="modal-info-item">
+                        <span>제조번호:</span>${product.serial}
+                    </div>
+                    <div class="modal-info-item">
+                        <span>설치일:</span>${formatDate(product.installDate)}
+                    </div>
+                </div>
+            `;
+
+            // 모달 탭 구조
+            const detailInfo = document.getElementById('detailInfo');
+            detailInfo.innerHTML = `
+                <!-- 모달 메인 탭 -->
+                <div class="modal-main-tabs">
+                    <button class="modal-main-tab active" onclick="switchMainTab('info')">제품 정보</button>
+                    <div class="modal-main-tab repair-tab-group" data-active-tab="receipt">
+                        <div class="repair-tab-header" onclick="switchMainTab('repair')">수리/교체 내역</div>
+                        <div class="repair-tab-subtabs">
+                            <button class="repair-subtab-btn" onclick="switchSubTab('receipt')">접수번호별</button>
+                            <button class="repair-subtab-btn" onclick="switchSubTab('part')">부품별</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 제품 정보 탭 컨텐츠 -->
+                <div class="modal-tab-content active" id="main-tab-info">
+                    ${renderProductInfoTab(product)}
+                </div>
+
+                <!-- 수리/교체 내역 탭 컨텐츠 -->
+                <div class="modal-tab-content" id="main-tab-repair">
+                    <!-- 접수번호별 뷰 -->
+                    <div class="sub-tab-content active" id="sub-tab-receipt"></div>
+
+                    <!-- 부품별 뷰 -->
+                    <div class="sub-tab-content" id="sub-tab-part"></div>
+                </div>
+            `;
+
+            // 초기 데이터 렌더링
+            renderRepairHistory();
+
+            document.getElementById('detailModal').classList.add('active');
+            requestAnimationFrame(updateMarkerCanvasScale);
+        }
+
+        // 이벤트 리스너
+        const fileInput = document.getElementById('fileInput');
+        if (fileInput) {
+            fileInput.addEventListener('change', function(e) {
+                alert('v6는 index_v6.json만 사용합니다. 엑셀 업로드는 비활성화됩니다.');
+            });
+        }
+
+        document.getElementById('backBtn').addEventListener('click', () => {
+            // 매장 선택 화면으로 복귀
+            document.getElementById('dashboardScreen').classList.remove('active');
+            document.getElementById('storeScreen').classList.add('active');
+            document.getElementById('backBtn').classList.remove('active');
+        });
+
+        document.getElementById('modalClose').addEventListener('click', () => {
+            // 모달 닫기
+            document.getElementById('detailModal').classList.remove('active');
+        });
+
+        document.getElementById('detailModal').addEventListener('click', (event) => {
+            // 오버레이 클릭 시 닫기
+            if (event.target.id === 'detailModal') {
+                document.getElementById('detailModal').classList.remove('active');
+            }
+        });
+
+        window.addEventListener('resize', () => {
+            if (document.getElementById('detailModal').classList.contains('active')) {
+                updateMarkerCanvasScale();
+            }
+        });
+
+        function updateMarkerCanvasScale() {
+            const wrap = document.querySelector('.detail-image-wrap');
+            if (!wrap) return;
+            wrap.style.setProperty('--canvas-scale', '1');
+        }
+
+        document.getElementById('productGroupSelect').addEventListener('change', updateDashboard);
+
+        document.getElementById('statAllCard').addEventListener('click', () => {
+            // 전체 제품 표시 (필터 초기화 목적)
+            currentStatusFilter = 'all';
+            updateDashboard();
+        });
+
+        document.getElementById('statReplaceCard').addEventListener('click', () => {
+            currentStatusFilter = 'replace';
+            updateDashboard();
+        });
+
+        document.getElementById('statCheckCard').addEventListener('click', () => {
+            currentStatusFilter = 'check';
+            updateDashboard();
+        });
+
+        // ========== 수리/교체 내역 관련 함수 ==========
+
+        // 메인 탭 전환 함수
+        function switchMainTab(tab) {
+            // 제품 정보 버튼 비활성화
+            document.querySelectorAll('.modal-main-tab:not(.repair-tab-group)').forEach(btn => {
+                btn.classList.remove('active');
+            });
+
+            // 수리/교체 내역 그룹 비활성화
+            const repairGroup = document.querySelector('.repair-tab-group');
+            if (repairGroup) {
+                repairGroup.classList.remove('active');
+            }
+
+            // 메인 탭 컨텐츠 표시
+            document.querySelectorAll('.modal-tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+
+            if (tab === 'info') {
+                // 제품 정보 탭 활성화
+                event.target.classList.add('active');
+                document.getElementById('main-tab-info').classList.add('active');
+
+                // 하위 탭 버튼들도 비활성화
+                document.querySelectorAll('.repair-subtab-btn').forEach(btn => {
+                    btn.classList.remove('active');
+                });
+            } else {
+                // 수리/교체 내역 탭 활성화
+                if (repairGroup) {
+                    repairGroup.classList.add('active');
+                    // 현재 선택된 하위 탭 유지 (data-active-tab 속성은 그대로)
+                    // 이미 설정된 값이 있으면 유지, 없으면 기본값 'receipt'
+                    if (!repairGroup.getAttribute('data-active-tab')) {
+                        repairGroup.setAttribute('data-active-tab', 'receipt');
+                    }
+                }
+                document.getElementById('main-tab-repair').classList.add('active');
+
+                // 현재 data-active-tab에 맞는 하위 탭 버튼 활성화
+                const activeSubTab = repairGroup ? repairGroup.getAttribute('data-active-tab') : 'receipt';
+                document.querySelectorAll('.repair-subtab-btn').forEach(btn => {
+                    btn.classList.remove('active');
+                });
+                const activeBtn = activeSubTab === 'receipt'
+                    ? document.querySelector('.repair-subtab-btn:first-child')
+                    : document.querySelector('.repair-subtab-btn:last-child');
+                if (activeBtn) {
+                    activeBtn.classList.add('active');
+                }
+            }
+        }
+
+        // 하위 탭 전환 함수
+        function switchSubTab(view) {
+            // 먼저 메인 탭도 수리/교체 내역으로 전환
+            document.querySelectorAll('.modal-main-tab:not(.repair-tab-group)').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            const repairGroup = document.querySelector('.repair-tab-group');
+            if (repairGroup) {
+                repairGroup.classList.add('active');
+                // data-active-tab 속성 업데이트 (border 위치 조정을 위해)
+                repairGroup.setAttribute('data-active-tab', view);
+            }
+
+            // 메인 탭 컨텐츠 표시
+            document.querySelectorAll('.modal-tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            document.getElementById('main-tab-repair').classList.add('active');
+
+            // 하위 탭 버튼 활성화
+            document.querySelectorAll('.repair-subtab-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+
+            // 하위 탭 컨텐츠 표시
+            document.querySelectorAll('.sub-tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+
+            if (view === 'receipt') {
+                document.getElementById('sub-tab-receipt').classList.add('active');
+            } else {
+                document.getElementById('sub-tab-part').classList.add('active');
+            }
+        }
+
+        // 접수번호별 뷰 렌더링
+        function renderReceiptView(receipts) {
+            if (receipts.length === 0) {
+                return '<div class="empty-message">교체 내역이 없습니다.</div>';
+            }
+
+            return receipts.map(receipt => {
+                console.log('=== renderReceiptView receipt 객체 ===');
+                console.log('접수번호:', receipt.receiptNumber);
+                console.log('기술료:', receipt.techFee, '(타입:', typeof receipt.techFee, ')');
+                console.log('출장비:', receipt.travelFee, '(타입:', typeof receipt.travelFee, ')');
+                console.log('총비용:', receipt.totalFee, '(타입:', typeof receipt.totalFee, ')');
+                console.log('부품:', receipt.parts);
+
+                const partsRows = receipt.parts.map(part => `
+                    <tr>
+                        <td>${part.partName || '-'}</td>
+                        <td>${part.partCode || '-'}</td>
+                        <td>${part.quantity || '-'}</td>
+                        <td>${formatCurrency(part.partFee)}원</td>
+                    </tr>
+                `).join('');
+
+                return `
+                    <div class="event-item">
+                        <div class="event-header">접수번호: ${receipt.receiptNumber}</div>
+                        <div class="event-meta">
+                            접수일: ${formatDate(receipt.receiptDate)} |
+                            처리자: ${receipt.processor || '-'} |
+                            칸구분: ${receipt.zone || '-'}
+                        </div>
+                        ${receipt.receiptContent ? `<div style="margin-bottom: 8px; font-size: 0.9rem;"><strong>접수내용:</strong> ${receipt.receiptContent}</div>` : ''}
+
+                        <div class="table-scroll">
+                        <table class="parts-table">
+                            <thead>
+                                <tr>
+                                    <th>부품명</th>
+                                    <th>부품코드</th>
+                                    <th>수량</th>
+                                    <th>부품비</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${partsRows}
+                            </tbody>
+                        </table>
+                        </div>
+
+                        <div class="fee-summary">
+                            <div>기술료: ${formatCurrency(receipt.techFee)}원</div>
+                            <div>출장비: ${formatCurrency(receipt.travelFee)}원</div>
+                            <div>부품비: ${formatCurrency(receipt.partFeeTotal)}원</div>
+                            <div class="fee-total">총 비용: ${formatCurrency(receipt.totalFee)}원</div>
+                        </div>
+
+                        ${receipt.processContent ? `<div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); font-size: 0.9rem;"><strong>처리내용:</strong> ${receipt.processContent}</div>` : ''}
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // 부품별 뷰 렌더링
+        function renderPartView(parts) {
+            if (parts.length === 0) {
+                return '<div class="empty-message">교체 내역이 없습니다.</div>';
+            }
+
+            return parts.map(part => {
+                const eventsRows = part.events.map(event => `
+                    <tr>
+                        <td>${formatDate(event.receiptDate)}</td>
+                        <td>${event.intervalText} ${event.isFirstReplace ? '<br><small style="color: var(--muted);">(설치일로부터)</small>' : ''}</td>
+                        <td>${event.processor || '-'}</td>
+                        <td>${event.receiptNumber}</td>
+                        <td>${event.zone || '-'}</td>
+                        <td>${formatCurrency(event.partFee)}원</td>
+                    </tr>
+                `).join('');
+
+                return `
+                    <div class="event-item">
+                        <div class="event-header">${part.partName} (${part.partCode})</div>
+                        <div class="event-meta">
+                            평균 교체 주기: ${part.avgIntervalText} (약 ${part.avgInterval}일)
+                        </div>
+
+                        <div class="table-scroll">
+                        <table class="parts-table">
+                            <thead>
+                                <tr>
+                                    <th>교체일</th>
+                                    <th>경과기간</th>
+                                    <th>처리자</th>
+                                    <th>접수번호</th>
+                                    <th>칸구분</th>
+                                    <th>부품비</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${eventsRows}
+                            </tbody>
+                        </table>
+                        </div>
+
+                        ${part.events[0]?.receiptContent ? `<div style="margin-top: 12px; font-size: 0.9rem;"><strong>접수내용:</strong> ${part.events[0].receiptContent}</div>` : ''}
+                        ${part.events[0]?.processContent ? `<div style="margin-top: 8px; font-size: 0.9rem;"><strong>처리내용:</strong> ${part.events[0].processContent}</div>` : ''}
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // 수리/교체 내역 초기 렌더링
+        function renderRepairHistory() {
+            if (!currentProduct) {
+                console.log('renderRepairHistory: currentProduct가 없습니다');
+                return;
+            }
+
+            const mgrNumber = currentProduct.mgr;
+            const installDate = currentProduct.installDate;
+
+            console.log('=== renderRepairHistory 호출 ===');
+            console.log('관리번호:', mgrNumber);
+            console.log('설치일:', installDate);
+            console.log('eventLogByMgr 전체 크기:', eventLogByMgr.size);
+            console.log('이 관리번호의 이벤트:', eventLogByMgr.get(mgrNumber));
+
+            // 접수번호별 데이터 그룹화
+            const receiptGroups = groupEventsByReceipt(mgrNumber);
+            console.log('접수번호별 그룹:', receiptGroups.length, '개');
+
+            // 부품별 데이터 그룹화
+            const partGroups = groupEventsByPart(mgrNumber, installDate);
+            console.log('부품별 그룹:', partGroups.length, '개');
+
+            // 하위 탭 컨텐츠 렌더링
+            document.getElementById('sub-tab-receipt').innerHTML = renderReceiptView(receiptGroups);
+            document.getElementById('sub-tab-part').innerHTML = renderPartView(partGroups);
+            console.log('렌더링 완료');
+        }
+
+
+        // 페이지 로드 시 실행
+        window.addEventListener('DOMContentLoaded', loadDefaultFile);
+    </script>
+</body>
+</html>
