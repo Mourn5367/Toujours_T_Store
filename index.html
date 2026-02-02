@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VIP 부품 교체 대시보드 v6</title>
+    <title>거북이점 제품 리스트</title>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&icon_names=undo">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
@@ -651,7 +651,7 @@
         }
 
         /* ---------- 모달 탭 스타일 ---------- */
-        /* 모달 메인 탭 (제품 정보 / 수리/교체 내역) */
+        /* 모달 메인 탭 (제품 정보 / 점검 내역 / 수리/교체 내역) */
         .modal-main-tabs {
             display: flex;
             border-bottom: 2px solid var(--line);
@@ -683,8 +683,9 @@
             background: rgba(99, 102, 241, 0.05);
         }
 
-        /* T자 모양 수리/교체 내역 탭 그룹 */
-        .repair-tab-group {
+        /* T자 모양 수리/교체/점검 내역 탭 그룹 */
+        .repair-tab-group,
+        .inspection-tab-group {
             flex: 1;
             padding: 0;
             display: flex;
@@ -695,7 +696,8 @@
         }
 
         /* active 상태일 때 하단 border (::after로 반쪽만 표시) */
-        .repair-tab-group.active::after {
+        .repair-tab-group.active::after,
+        .inspection-tab-group.active::after {
             content: '';
             position: absolute;
             bottom: 0;
@@ -706,20 +708,24 @@
         }
 
         /* 접수번호별 선택 시 왼쪽 절반 */
-        .repair-tab-group.active[data-active-tab="receipt"]::after {
+        .repair-tab-group.active[data-active-tab="receipt"]::after,
+        .inspection-tab-group.active[data-active-tab="receipt"]::after {
             left: 0;
         }
 
         /* 부품별 선택 시 오른쪽 절반 */
-        .repair-tab-group.active[data-active-tab="part"]::after {
+        .repair-tab-group.active[data-active-tab="part"]::after,
+        .inspection-tab-group.active[data-active-tab="part"]::after {
             left: 50%;
         }
 
-        .repair-tab-group.active .repair-tab-header {
+        .repair-tab-group.active .repair-tab-header,
+        .inspection-tab-group.active .inspection-tab-header {
             color: var(--accent);
         }
 
-        .repair-tab-header {
+        .repair-tab-header,
+        .inspection-tab-header {
             padding: 10px 20px;
             font-size: 1rem;
             font-weight: 600;
@@ -730,18 +736,21 @@
             border-bottom: 1px solid var(--line);
         }
 
-        .repair-tab-header:hover {
+        .repair-tab-header:hover,
+        .inspection-tab-header:hover {
             background: rgba(99, 102, 241, 0.05);
         }
 
-        .repair-tab-subtabs {
+        .repair-tab-subtabs,
+        .inspection-tab-subtabs {
             display: grid;
             grid-template-columns: 1fr 1fr;
             padding: 0;
             background: transparent;
         }
 
-        .repair-subtab-btn {
+        .repair-subtab-btn,
+        .inspection-subtab-btn {
             padding: 8px 12px;
             border: none;
             background: transparent;
@@ -753,17 +762,32 @@
             text-align: center;
         }
 
-        .repair-subtab-btn:first-child {
+        .repair-subtab-btn:first-child,
+        .inspection-subtab-btn:first-child {
             border-right: 1px solid var(--line);
         }
 
-        .repair-subtab-btn.active {
+        .repair-subtab-btn.active,
+        .inspection-subtab-btn.active {
             color: var(--accent);
             font-weight: 600;
         }
 
-        .repair-subtab-btn:hover {
+        .repair-subtab-btn:hover,
+        .inspection-subtab-btn:hover {
             color: var(--accent);
+        }
+
+        .inspection-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 8px;
+            border-radius: 999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: #1e3a8a;
+            background: #dbeafe;
         }
 
         /* 탭 컨텐츠 */
@@ -1005,7 +1029,10 @@
             TECH_FEE: '기술료',
             TRAVEL_FEE: '출장비',
             USAGE_ENV: '사용환경',
-            ETC: '기타'
+            ETC: '기타',
+            INSPECTION_DATE: '점검일',
+            INSPECTION_RESULT: '점검결과',
+            INSPECTION_GRACE_DAYS: '점검유예일'
         };
 
         // 런타임 상태
@@ -1013,8 +1040,10 @@
         let imageData = new Map(); // 관리번호 → {imageUrl, store}
         let diagramImageData = []; // 제품 도면 이미지 목록
         let productMarkersData = []; // 제품별 마커 데이터 목록
-        let eventLogData = []; // 전체 이벤트로그 (117개)
+        let eventLogData = []; // 전체 이벤트로그 (수리/교체)
         let eventLogByMgr = new Map(); // 관리번호별 그룹화
+        let inspectionLogData = []; // 점검 이벤트로그
+        let inspectionLogByMgr = new Map(); // 관리번호별 점검 그룹화
         let selectedStore = '';
         let currentStatusFilter = 'all';
         let currentProduct = null;
@@ -1064,6 +1093,7 @@
                 const partCode = event[EVENT_LOG_KEYS.PART_CODE];
                 const receiptDate = event[EVENT_LOG_KEYS.RECEIPT_DATE];
                 if (!partCode || !receiptDate) return;
+                if (isInspectionOnlyEvent(event)) return;
                 if (!lastByPartCode.has(partCode)) {
                     lastByPartCode.set(partCode, receiptDate);
                     return;
@@ -1077,9 +1107,90 @@
             return lastByPartCode;
         }
 
+        function isInspectionOnlyEvent(event) {
+            const inspectionDate = event[EVENT_LOG_KEYS.INSPECTION_DATE];
+            if (!inspectionDate) return false;
+            const partFee = parseNumber(event[EVENT_LOG_KEYS.PART_FEE]);
+            const quantity = parseNumber(event[EVENT_LOG_KEYS.QUANTITY]);
+            return partFee <= 0 && quantity <= 0;
+        }
+
+        function isPositiveInspectionResult(result) {
+            const text = String(result || '').trim();
+            if (!text) return false;
+            return text.includes('정상') || text.includes('양호') || text.toLowerCase() === 'ok';
+        }
+
+        function getZoneSummary(items) {
+            const zones = items.map(item => item[EVENT_LOG_KEYS.ZONE]).filter(Boolean);
+            if (zones.length === 0) return '-';
+            const uniqueZones = Array.from(new Set(zones));
+            return uniqueZones.length === 1 ? uniqueZones[0] : '복수';
+        }
+
+        function getLatestInspectionByPartCode(mgrNumber) {
+            const events = inspectionLogByMgr.get(mgrNumber) || [];
+            const inspectionByPartCode = new Map();
+            events.forEach(event => {
+                const partCode = event[EVENT_LOG_KEYS.PART_CODE];
+                const inspectionDate = event[EVENT_LOG_KEYS.INSPECTION_DATE];
+                if (!partCode || !inspectionDate) return;
+                if (!inspectionByPartCode.has(partCode)) {
+                    inspectionByPartCode.set(partCode, {
+                        inspectionDate,
+                        inspectionResult: event[EVENT_LOG_KEYS.INSPECTION_RESULT],
+                        graceDays: event[EVENT_LOG_KEYS.INSPECTION_GRACE_DAYS]
+                    });
+                    return;
+                }
+                const current = new Date(inspectionByPartCode.get(partCode).inspectionDate);
+                const next = new Date(inspectionDate);
+                if (next > current) {
+                    inspectionByPartCode.set(partCode, {
+                        inspectionDate,
+                        inspectionResult: event[EVENT_LOG_KEYS.INSPECTION_RESULT],
+                        graceDays: event[EVENT_LOG_KEYS.INSPECTION_GRACE_DAYS]
+                    });
+                }
+            });
+            return inspectionByPartCode;
+        }
+
+        function getInspectionGraceState(inspectionInfo) {
+            if (!inspectionInfo || !inspectionInfo.inspectionDate) {
+                return { isGraceActive: false, graceDays: 0, graceUntil: null };
+            }
+            if (!isPositiveInspectionResult(inspectionInfo.inspectionResult)) {
+                return { isGraceActive: false, graceDays: 0, graceUntil: null };
+            }
+            const graceDays = parseNumber(inspectionInfo.graceDays);
+            if (!graceDays) {
+                return { isGraceActive: false, graceDays: 0, graceUntil: null };
+            }
+            const inspectionDate = new Date(inspectionInfo.inspectionDate);
+            if (isNaN(inspectionDate.getTime())) {
+                return { isGraceActive: false, graceDays: 0, graceUntil: null };
+            }
+            const graceUntil = new Date(inspectionDate);
+            graceUntil.setDate(graceUntil.getDate() + graceDays);
+            const isGraceActive = new Date() <= graceUntil;
+            return { isGraceActive, graceDays, graceUntil };
+        }
+
+        function getGraceLifePercent(graceState) {
+            if (!graceState || !graceState.isGraceActive) return null;
+            const totalDays = parseNumber(graceState.graceDays);
+            if (!totalDays) return null;
+            const now = new Date();
+            const remainingDays = Math.max(0, Math.ceil((graceState.graceUntil - now) / (1000 * 60 * 60 * 24)));
+            const percent = Math.round((remainingDays / totalDays) * 100);
+            return Math.min(Math.max(percent, 0), 100);
+        }
+
         function getProductPartCounts(product) {
             const parts = getProductMarkers(product.productName) || [];
             const lastByPartCode = getLastByPartCode(product.mgr);
+            const inspectionByPartCode = getLatestInspectionByPartCode(product.mgr);
             let replaceCount = 0;
             let checkCount = 0;
 
@@ -1087,6 +1198,11 @@
                 const lastDate = lastByPartCode.get(part.code) || product.installDate || part.last;
                 const lifePercent = calculateLifePercent(part.recommendedYears, lastDate);
                 const life = lifePercent ?? part.life ?? 0;
+                const inspectionInfo = inspectionByPartCode.get(part.code);
+                const graceState = getInspectionGraceState(inspectionInfo);
+                if (graceState.isGraceActive) {
+                    return;
+                }
                 if (life < 35) {
                     replaceCount += 1;
                 } else if (life <= 55) {
@@ -1230,6 +1346,7 @@
             const grouped = new Map(); // 접수번호 → 이벤트 배열
 
             events.forEach(event => {
+                if (isInspectionOnlyEvent(event)) return;
                 const receiptNum = event[EVENT_LOG_KEYS.RECEIPT_NUMBER];
                 if (!grouped.has(receiptNum)) {
                     grouped.set(receiptNum, []);
@@ -1242,6 +1359,7 @@
                 const travelFee = parseNumber(items[0][EVENT_LOG_KEYS.TRAVEL_FEE]);
                 const partFeeTotal = calculatePartFeeTotal(items);
                 const totalFee = calculateTotalFee(items);
+                const zoneSummary = getZoneSummary(items);
 
                 console.log(`접수번호 ${receiptNum}: 기술료=${techFee}, 출장비=${travelFee}, 총비용=${totalFee}`);
 
@@ -1249,7 +1367,7 @@
                     receiptNumber: receiptNum,
                     receiptDate: items[0][EVENT_LOG_KEYS.RECEIPT_DATE],
                     processor: items[0][EVENT_LOG_KEYS.PROCESSOR],
-                    zone: items[0][EVENT_LOG_KEYS.ZONE],
+                    zone: zoneSummary,
                     receiptContent: items[0][EVENT_LOG_KEYS.RECEIPT_CONTENT],
                     processContent: items[0][EVENT_LOG_KEYS.PROCESS_CONTENT],
                     parts: items.map(item => {
@@ -1259,7 +1377,8 @@
                             partCode: item[EVENT_LOG_KEYS.PART_CODE],
                             partName: item[EVENT_LOG_KEYS.PART_NAME],
                             quantity: item[EVENT_LOG_KEYS.QUANTITY],
-                            partFee: partFee
+                            partFee: partFee,
+                            zone: item[EVENT_LOG_KEYS.ZONE]
                         };
                     }),
                     techFee: techFee,
@@ -1280,6 +1399,7 @@
             events.forEach(event => {
                 const partCode = event[EVENT_LOG_KEYS.PART_CODE];
                 if (!partCode) return; // 부품코드 없는 항목 스킵
+                if (isInspectionOnlyEvent(event)) return;
 
                 if (!grouped.has(partCode)) {
                     grouped.set(partCode, {
@@ -1341,6 +1461,100 @@
                     avgInterval: avgInterval,
                     avgIntervalText: formatInterval(avgInterval)
                 });
+            });
+
+            return result;
+        }
+
+        // 점검 접수번호별로 이벤트 그룹화
+        function groupInspectionsByReceipt(mgrNumber) {
+            const events = (inspectionLogByMgr.get(mgrNumber) || []).filter(event => event[EVENT_LOG_KEYS.INSPECTION_DATE]);
+            const grouped = new Map(); // 접수번호 → 이벤트 배열
+
+            events.forEach(event => {
+                const receiptNum = event[EVENT_LOG_KEYS.RECEIPT_NUMBER] || '미상';
+                if (!grouped.has(receiptNum)) {
+                    grouped.set(receiptNum, []);
+                }
+                grouped.get(receiptNum).push(event);
+            });
+
+            const result = Array.from(grouped.entries()).map(([receiptNum, items]) => {
+                return {
+                    receiptNumber: receiptNum,
+                    inspectionDate: items[0][EVENT_LOG_KEYS.INSPECTION_DATE],
+                    processor: items[0][EVENT_LOG_KEYS.PROCESSOR],
+                    zone: getZoneSummary(items),
+                    receiptContent: items[0][EVENT_LOG_KEYS.RECEIPT_CONTENT],
+                    processContent: items[0][EVENT_LOG_KEYS.PROCESS_CONTENT],
+                    parts: items.map(item => ({
+                        partCode: item[EVENT_LOG_KEYS.PART_CODE],
+                        partName: item[EVENT_LOG_KEYS.PART_NAME],
+                        inspectionResult: item[EVENT_LOG_KEYS.INSPECTION_RESULT],
+                        graceDays: item[EVENT_LOG_KEYS.INSPECTION_GRACE_DAYS],
+                        zone: item[EVENT_LOG_KEYS.ZONE]
+                    }))
+                };
+            });
+
+            result.sort((a, b) => {
+                const dateA = new Date(a.inspectionDate);
+                const dateB = new Date(b.inspectionDate);
+                return dateB - dateA;
+            });
+
+            return result;
+        }
+
+        // 점검 부품별로 이벤트 그룹화
+        function groupInspectionsByPart(mgrNumber) {
+            const events = (inspectionLogByMgr.get(mgrNumber) || []).filter(event => {
+                return event[EVENT_LOG_KEYS.INSPECTION_DATE] && event[EVENT_LOG_KEYS.PART_CODE];
+            });
+            const grouped = new Map(); // 부품코드 → 이벤트 배열
+
+            events.forEach(event => {
+                const partCode = event[EVENT_LOG_KEYS.PART_CODE];
+                if (!partCode) return;
+                if (!grouped.has(partCode)) {
+                    grouped.set(partCode, {
+                        partName: event[EVENT_LOG_KEYS.PART_NAME],
+                        events: []
+                    });
+                }
+                grouped.get(partCode).events.push(event);
+            });
+
+            const result = [];
+            grouped.forEach((data, partCode) => {
+                data.events.sort((a, b) => {
+                    const dateA = new Date(a[EVENT_LOG_KEYS.INSPECTION_DATE]);
+                    const dateB = new Date(b[EVENT_LOG_KEYS.INSPECTION_DATE]);
+                    return dateB - dateA;
+                });
+
+                const eventsView = data.events.map(event => ({
+                    inspectionDate: event[EVENT_LOG_KEYS.INSPECTION_DATE],
+                    inspectionResult: event[EVENT_LOG_KEYS.INSPECTION_RESULT],
+                    graceDays: event[EVENT_LOG_KEYS.INSPECTION_GRACE_DAYS],
+                    processor: event[EVENT_LOG_KEYS.PROCESSOR],
+                    receiptNumber: event[EVENT_LOG_KEYS.RECEIPT_NUMBER],
+                    zone: event[EVENT_LOG_KEYS.ZONE],
+                    receiptContent: event[EVENT_LOG_KEYS.RECEIPT_CONTENT],
+                    processContent: event[EVENT_LOG_KEYS.PROCESS_CONTENT]
+                }));
+
+                result.push({
+                    partCode,
+                    partName: data.partName,
+                    events: eventsView
+                });
+            });
+
+            result.sort((a, b) => {
+                const dateA = new Date(a.events[0]?.inspectionDate || 0);
+                const dateB = new Date(b.events[0]?.inspectionDate || 0);
+                return dateB - dateA;
             });
 
             return result;
@@ -1516,6 +1730,7 @@
                 const partsMaster = new Map((payload.parts_master || []).map(item => [item.mes_code, item]));
                 const receipts = payload.event_receipts || [];
                 const parts = payload.event_parts || [];
+                const inspectionParts = payload.inspection_parts || [];
                 const markers = payload.product_markers || [];
                 const markerSettings = payload.product_marker_settings || [];
                 const markerScaleByProductId = new Map(
@@ -1598,7 +1813,7 @@
                     '마커': list
                 }));
 
-                // 이벤트 로그 데이터 구성
+                // 수리/교체 이벤트 로그 데이터 구성
                 const receiptById = new Map(receipts.map(item => [item.id, item]));
                 eventLogData = parts.map(partItem => {
                     const receipt = receiptById.get(partItem.receipt_id);
@@ -1607,6 +1822,7 @@
                     const store = inst ? stores.get(inst.store_id) : null;
                     const product = inst ? products.get(inst.product_id) : null;
                     const group = product ? groups.get(product.product_group_id) : null;
+                    const zoneValue = partItem.zone || receipt.zone || '';
 
                     return {
                         [EVENT_LOG_KEYS.SHEET_NAME]: '',
@@ -1619,7 +1835,7 @@
                         [EVENT_LOG_KEYS.MGR_NUMBER]: inst ? inst.mgr_number : '',
                         [EVENT_LOG_KEYS.RECEIPT_DATE]: receipt.receipt_date || '',
                         [EVENT_LOG_KEYS.RECEIPT_NUMBER]: receipt.receipt_number || '',
-                        [EVENT_LOG_KEYS.ZONE]: receipt.zone || '',
+                        [EVENT_LOG_KEYS.ZONE]: zoneValue,
                         [EVENT_LOG_KEYS.RECEIPT_CONTENT]: receipt.receipt_content || '',
                         [EVENT_LOG_KEYS.PROCESS_CONTENT]: receipt.process_content || '',
                         [EVENT_LOG_KEYS.PROCESSOR]: receipt.processor || '',
@@ -1634,7 +1850,7 @@
                     };
                 }).filter(Boolean);
 
-                // 관리번호별 그룹화
+                // 관리번호별 그룹화 (수리/교체)
                 eventLogByMgr.clear();
                 eventLogData.forEach(event => {
                     const mgrNumber = event[EVENT_LOG_KEYS.MGR_NUMBER];
@@ -1644,12 +1860,71 @@
                     eventLogByMgr.get(mgrNumber).push(event);
                 });
 
+                // 점검 이벤트 로그 데이터 구성
+                inspectionLogData = inspectionParts.map(partItem => {
+                    const receipt = receiptById.get(partItem.receipt_id);
+                    if (!receipt) return null;
+                    const inst = instanceById.get(receipt.product_instance_id);
+                    const store = inst ? stores.get(inst.store_id) : null;
+                    const product = inst ? products.get(inst.product_id) : null;
+                    const group = product ? groups.get(product.product_group_id) : null;
+                    const zoneValue = partItem.zone || receipt.zone || '';
+                    const inspectionDate = partItem.inspection_date || partItem.inspectionDate || '';
+
+                    return {
+                        [EVENT_LOG_KEYS.SHEET_NAME]: '',
+                        [EVENT_LOG_KEYS.INSTALL_DATE]: inst ? inst.install_date : '',
+                        [EVENT_LOG_KEYS.SERIAL]: inst ? inst.serial_number : '',
+                        [EVENT_LOG_KEYS.STORE]: store ? store.store_name : '',
+                        [EVENT_LOG_KEYS.LOCATION]: inst ? inst.location : '',
+                        [EVENT_LOG_KEYS.GROUP]: group ? group.group_name : '',
+                        [EVENT_LOG_KEYS.PRODUCT_NAME]: product ? product.product_name : '',
+                        [EVENT_LOG_KEYS.MGR_NUMBER]: inst ? inst.mgr_number : '',
+                        [EVENT_LOG_KEYS.RECEIPT_DATE]: receipt.receipt_date || '',
+                        [EVENT_LOG_KEYS.RECEIPT_NUMBER]: receipt.receipt_number || '',
+                        [EVENT_LOG_KEYS.ZONE]: zoneValue,
+                        [EVENT_LOG_KEYS.RECEIPT_CONTENT]: receipt.receipt_content || '',
+                        [EVENT_LOG_KEYS.PROCESS_CONTENT]: receipt.process_content || '',
+                        [EVENT_LOG_KEYS.PROCESSOR]: receipt.processor || '',
+                        [EVENT_LOG_KEYS.PART_CODE]: partItem.mes_code || '',
+                        [EVENT_LOG_KEYS.PART_NAME]: partItem.part_name || '',
+                        [EVENT_LOG_KEYS.QUANTITY]: '',
+                        [EVENT_LOG_KEYS.PART_FEE]: '',
+                        [EVENT_LOG_KEYS.TECH_FEE]: receipt.tech_fee || '',
+                        [EVENT_LOG_KEYS.TRAVEL_FEE]: receipt.travel_fee || '',
+                        [EVENT_LOG_KEYS.USAGE_ENV]: '',
+                        [EVENT_LOG_KEYS.ETC]: '',
+                        [EVENT_LOG_KEYS.INSPECTION_DATE]: inspectionDate,
+                        [EVENT_LOG_KEYS.INSPECTION_RESULT]: partItem.inspection_result || partItem.inspectionResult || '',
+                        [EVENT_LOG_KEYS.INSPECTION_GRACE_DAYS]: partItem.inspection_grace_days || partItem.inspectionGraceDays || ''
+                    };
+                }).filter(Boolean);
+
+                // 관리번호별 그룹화 (점검)
+                inspectionLogByMgr.clear();
+                inspectionLogData.forEach(event => {
+                    const mgrNumber = event[EVENT_LOG_KEYS.MGR_NUMBER];
+                    if (!inspectionLogByMgr.has(mgrNumber)) {
+                        inspectionLogByMgr.set(mgrNumber, []);
+                    }
+                    inspectionLogByMgr.get(mgrNumber).push(event);
+                });
+
                 // 각 관리번호의 이벤트를 접수일시 순으로 정렬 (최신순)
                 eventLogByMgr.forEach((events, mgrNumber) => {
                     events.sort((a, b) => {
                         const dateA = new Date(a[EVENT_LOG_KEYS.RECEIPT_DATE]);
                         const dateB = new Date(b[EVENT_LOG_KEYS.RECEIPT_DATE]);
                         return dateB - dateA; // 최신순
+                    });
+                });
+
+                // 각 관리번호의 점검 이벤트 정렬 (최신순)
+                inspectionLogByMgr.forEach((events, mgrNumber) => {
+                    events.sort((a, b) => {
+                        const dateA = new Date(a[EVENT_LOG_KEYS.INSPECTION_DATE] || a[EVENT_LOG_KEYS.RECEIPT_DATE]);
+                        const dateB = new Date(b[EVENT_LOG_KEYS.INSPECTION_DATE] || b[EVENT_LOG_KEYS.RECEIPT_DATE]);
+                        return dateB - dateA;
                     });
                 });
 
@@ -1864,7 +2139,8 @@
             });
         }
 
-        function getLifeColor(life) {
+        function getLifeColor(life, isGraceActive) {
+            if (isGraceActive) return '#2563eb'; // blue for inspection grace
             if (life >= 75) return '#1b8f58'; // green
             if (life >= 55) return '#facc15'; // yellow
             if (life >= 35) return '#f59e0b'; // orange
@@ -1890,21 +2166,24 @@
             const demoParts = getProductMarkers(product.productName);
             console.log(`마커 데이터 조회: ${product.productName} → ${demoParts.length}개 마커`);
 
-            const events = eventLogByMgr.get(product.mgr) || [];
-            const lastByPartCode = new Map();
-            events.forEach(event => {
-                const partCode = event[EVENT_LOG_KEYS.PART_CODE];
-                const receiptDate = event[EVENT_LOG_KEYS.RECEIPT_DATE];
-                if (!partCode || !receiptDate) return;
-                if (!lastByPartCode.has(partCode)) {
-                    lastByPartCode.set(partCode, receiptDate);
-                }
-            });
+            const lastByPartCode = getLastByPartCode(product.mgr);
+            const inspectionByPartCode = getLatestInspectionByPartCode(product.mgr);
 
             const partsWithLast = demoParts.map(part => {
                 const lastDate = lastByPartCode.get(part.code) || product.installDate || part.last;
                 const lifePercent = calculateLifePercent(part.recommendedYears, lastDate);
-                return { ...part, last: lastDate, life: lifePercent ?? part.life };
+                const inspectionInfo = inspectionByPartCode.get(part.code);
+                const graceState = getInspectionGraceState(inspectionInfo);
+                const graceLifePercent = getGraceLifePercent(graceState);
+                return {
+                    ...part,
+                    last: lastDate,
+                    life: graceLifePercent ?? lifePercent ?? part.life,
+                    inspectionDate: inspectionInfo ? inspectionInfo.inspectionDate : '',
+                    inspectionResult: inspectionInfo ? inspectionInfo.inspectionResult : '',
+                    inspectionGraceDays: inspectionInfo ? inspectionInfo.graceDays : '',
+                    inspectionGraceState: graceState
+                };
             });
             partsWithLast.sort((a, b) => {
                 const lifeA = a.life ?? 0;
@@ -1916,7 +2195,7 @@
             });
 
             const markersHtml = partsWithLast.map(part => {
-                const color = getLifeColor(part.life);
+                const color = getLifeColor(part.life, part.inspectionGraceState?.isGraceActive);
                 const direction = part.direction || 'bottom';
                 const scale = part.scale || 1;
                 const lineLength = (part.lineLength || 40) * scale;
@@ -2002,8 +2281,14 @@
                     <td>${part.code}</td>
                     <td>${formatDate(part.last)}</td>
                     <td>
+                        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                            <span>${formatDate(part.inspectionDate)}</span>
+                            ${part.inspectionGraceState?.isGraceActive ? `<span class="inspection-badge">점검 완료 (${part.inspectionGraceState.graceDays}일)</span>` : ''}
+                        </div>
+                    </td>
+                    <td>
                         <div class="life-bar" style="margin: 0;">
-                            <div class="life-fill" style="width: ${Math.min(part.life, 100)}%; background: ${getLifeColor(part.life)};"></div>
+                            <div class="life-fill" style="width: ${Math.min(part.life, 100)}%; background: ${getLifeColor(part.life, part.inspectionGraceState?.isGraceActive)};"></div>
                         </div>
                         <div class="life-meta" style="margin-top: 4px;">${part.life}%</div>
                     </td>
@@ -2028,6 +2313,7 @@
                             <th>부품명</th>
                             <th>부품 코드</th>
                             <th>마지막 교체일</th>
+                            <th>마지막 점검일</th>
                             <th>부품 수명</th>
                         </tr>
                     </thead>
@@ -2062,12 +2348,19 @@
             detailInfo.innerHTML = `
                 <!-- 모달 메인 탭 -->
                 <div class="modal-main-tabs">
-                    <button class="modal-main-tab active" onclick="switchMainTab('info')">제품 정보</button>
+                    <button class="modal-main-tab active simple-tab" onclick="switchMainTab('info')">제품 정보</button>
+                    <div class="modal-main-tab inspection-tab-group" data-active-tab="receipt">
+                        <div class="inspection-tab-header" onclick="switchMainTab('inspection')">점검 내역</div>
+                        <div class="inspection-tab-subtabs">
+                            <button class="inspection-subtab-btn" onclick="switchSubTab('inspection', 'receipt')">접수번호별</button>
+                            <button class="inspection-subtab-btn" onclick="switchSubTab('inspection', 'part')">부품별</button>
+                        </div>
+                    </div>
                     <div class="modal-main-tab repair-tab-group" data-active-tab="receipt">
                         <div class="repair-tab-header" onclick="switchMainTab('repair')">수리/교체 내역</div>
                         <div class="repair-tab-subtabs">
-                            <button class="repair-subtab-btn" onclick="switchSubTab('receipt')">접수번호별</button>
-                            <button class="repair-subtab-btn" onclick="switchSubTab('part')">부품별</button>
+                            <button class="repair-subtab-btn" onclick="switchSubTab('repair', 'receipt')">접수번호별</button>
+                            <button class="repair-subtab-btn" onclick="switchSubTab('repair', 'part')">부품별</button>
                         </div>
                     </div>
                 </div>
@@ -2075,6 +2368,15 @@
                 <!-- 제품 정보 탭 컨텐츠 -->
                 <div class="modal-tab-content active" id="main-tab-info">
                     ${renderProductInfoTab(product)}
+                </div>
+
+                <!-- 점검 내역 탭 컨텐츠 -->
+                <div class="modal-tab-content" id="main-tab-inspection">
+                    <!-- 접수번호별 뷰 -->
+                    <div class="sub-tab-content active" id="sub-tab-inspection-receipt"></div>
+
+                    <!-- 부품별 뷰 -->
+                    <div class="sub-tab-content" id="sub-tab-inspection-part"></div>
                 </div>
 
                 <!-- 수리/교체 내역 탭 컨텐츠 -->
@@ -2089,6 +2391,7 @@
 
             // 초기 데이터 렌더링
             renderRepairHistory();
+            renderInspectionHistory();
 
             document.getElementById('detailModal').classList.add('active');
             requestAnimationFrame(updateMarkerCanvasScale);
@@ -2156,14 +2459,18 @@
         // 메인 탭 전환 함수
         function switchMainTab(tab) {
             // 제품 정보 버튼 비활성화
-            document.querySelectorAll('.modal-main-tab:not(.repair-tab-group)').forEach(btn => {
+            document.querySelectorAll('.modal-main-tab.simple-tab').forEach(btn => {
                 btn.classList.remove('active');
             });
 
-            // 수리/교체 내역 그룹 비활성화
+            // 수리/교체/점검 내역 그룹 비활성화
             const repairGroup = document.querySelector('.repair-tab-group');
+            const inspectionGroup = document.querySelector('.inspection-tab-group');
             if (repairGroup) {
                 repairGroup.classList.remove('active');
+            }
+            if (inspectionGroup) {
+                inspectionGroup.classList.remove('active');
             }
 
             // 메인 탭 컨텐츠 표시
@@ -2180,59 +2487,126 @@
                 document.querySelectorAll('.repair-subtab-btn').forEach(btn => {
                     btn.classList.remove('active');
                 });
-            } else {
-                // 수리/교체 내역 탭 활성화
-                if (repairGroup) {
-                    repairGroup.classList.add('active');
-                    // 현재 선택된 하위 탭 유지 (data-active-tab 속성은 그대로)
-                    // 이미 설정된 값이 있으면 유지, 없으면 기본값 'receipt'
-                    if (!repairGroup.getAttribute('data-active-tab')) {
-                        repairGroup.setAttribute('data-active-tab', 'receipt');
+                document.querySelectorAll('.inspection-subtab-btn').forEach(btn => {
+                    btn.classList.remove('active');
+                });
+                return;
+            }
+
+            if (tab === 'inspection') {
+                if (inspectionGroup) {
+                    inspectionGroup.classList.add('active');
+                    if (!inspectionGroup.getAttribute('data-active-tab')) {
+                        inspectionGroup.setAttribute('data-active-tab', 'receipt');
                     }
                 }
-                document.getElementById('main-tab-repair').classList.add('active');
+                document.getElementById('main-tab-inspection').classList.add('active');
 
-                // 현재 data-active-tab에 맞는 하위 탭 버튼 활성화
-                const activeSubTab = repairGroup ? repairGroup.getAttribute('data-active-tab') : 'receipt';
-                document.querySelectorAll('.repair-subtab-btn').forEach(btn => {
+                const activeSubTab = inspectionGroup ? inspectionGroup.getAttribute('data-active-tab') : 'receipt';
+                document.querySelectorAll('.inspection-subtab-btn').forEach(btn => {
                     btn.classList.remove('active');
                 });
                 const activeBtn = activeSubTab === 'receipt'
-                    ? document.querySelector('.repair-subtab-btn:first-child')
-                    : document.querySelector('.repair-subtab-btn:last-child');
+                    ? document.querySelector('.inspection-subtab-btn:first-child')
+                    : document.querySelector('.inspection-subtab-btn:last-child');
                 if (activeBtn) {
                     activeBtn.classList.add('active');
                 }
+
+                document.querySelectorAll('#main-tab-inspection .sub-tab-content').forEach(content => {
+                    content.classList.remove('active');
+                });
+                if (activeSubTab === 'receipt') {
+                    document.getElementById('sub-tab-inspection-receipt').classList.add('active');
+                } else {
+                    document.getElementById('sub-tab-inspection-part').classList.add('active');
+                }
+                return;
+            }
+
+            // 수리/교체 내역 탭 활성화
+            if (repairGroup) {
+                repairGroup.classList.add('active');
+                if (!repairGroup.getAttribute('data-active-tab')) {
+                    repairGroup.setAttribute('data-active-tab', 'receipt');
+                }
+            }
+            document.getElementById('main-tab-repair').classList.add('active');
+
+            const activeSubTab = repairGroup ? repairGroup.getAttribute('data-active-tab') : 'receipt';
+            document.querySelectorAll('.repair-subtab-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            const activeBtn = activeSubTab === 'receipt'
+                ? document.querySelector('.repair-subtab-btn:first-child')
+                : document.querySelector('.repair-subtab-btn:last-child');
+            if (activeBtn) {
+                activeBtn.classList.add('active');
+            }
+            document.querySelectorAll('#main-tab-repair .sub-tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            if (activeSubTab === 'receipt') {
+                document.getElementById('sub-tab-receipt').classList.add('active');
+            } else {
+                document.getElementById('sub-tab-part').classList.add('active');
             }
         }
 
         // 하위 탭 전환 함수
-        function switchSubTab(view) {
-            // 먼저 메인 탭도 수리/교체 내역으로 전환
-            document.querySelectorAll('.modal-main-tab:not(.repair-tab-group)').forEach(btn => {
+        function switchSubTab(group, view) {
+            document.querySelectorAll('.modal-main-tab.simple-tab').forEach(btn => {
                 btn.classList.remove('active');
             });
+
             const repairGroup = document.querySelector('.repair-tab-group');
+            const inspectionGroup = document.querySelector('.inspection-tab-group');
             if (repairGroup) {
-                repairGroup.classList.add('active');
-                // data-active-tab 속성 업데이트 (border 위치 조정을 위해)
-                repairGroup.setAttribute('data-active-tab', view);
+                repairGroup.classList.remove('active');
+            }
+            if (inspectionGroup) {
+                inspectionGroup.classList.remove('active');
             }
 
-            // 메인 탭 컨텐츠 표시
             document.querySelectorAll('.modal-tab-content').forEach(content => {
                 content.classList.remove('active');
             });
+
+            if (group === 'inspection') {
+                if (inspectionGroup) {
+                    inspectionGroup.classList.add('active');
+                    inspectionGroup.setAttribute('data-active-tab', view);
+                }
+                document.getElementById('main-tab-inspection').classList.add('active');
+
+                document.querySelectorAll('.inspection-subtab-btn').forEach(btn => {
+                    btn.classList.remove('active');
+                });
+                event.target.classList.add('active');
+
+                document.querySelectorAll('#main-tab-inspection .sub-tab-content').forEach(content => {
+                    content.classList.remove('active');
+                });
+                if (view === 'receipt') {
+                    document.getElementById('sub-tab-inspection-receipt').classList.add('active');
+                } else {
+                    document.getElementById('sub-tab-inspection-part').classList.add('active');
+                }
+                return;
+            }
+
+            if (repairGroup) {
+                repairGroup.classList.add('active');
+                repairGroup.setAttribute('data-active-tab', view);
+            }
             document.getElementById('main-tab-repair').classList.add('active');
 
-            // 하위 탭 버튼 활성화
             document.querySelectorAll('.repair-subtab-btn').forEach(btn => {
                 btn.classList.remove('active');
             });
             event.target.classList.add('active');
 
-            // 하위 탭 컨텐츠 표시
-            document.querySelectorAll('.sub-tab-content').forEach(content => {
+            document.querySelectorAll('#main-tab-repair .sub-tab-content').forEach(content => {
                 content.classList.remove('active');
             });
 
@@ -2261,6 +2635,7 @@
                     <tr>
                         <td>${part.partName || '-'}</td>
                         <td>${part.partCode || '-'}</td>
+                        <td>${part.zone || '-'}</td>
                         <td>${part.quantity || '-'}</td>
                         <td>${formatCurrency(part.partFee)}원</td>
                     </tr>
@@ -2282,6 +2657,7 @@
                                 <tr>
                                     <th>부품명</th>
                                     <th>부품코드</th>
+                                    <th>칸구분</th>
                                     <th>수량</th>
                                     <th>부품비</th>
                                 </tr>
@@ -2355,6 +2731,103 @@
             }).join('');
         }
 
+        // 점검 접수번호별 뷰 렌더링
+        function renderInspectionReceiptView(receipts) {
+            if (receipts.length === 0) {
+                return '<div class="empty-message">점검 내역이 없습니다.</div>';
+            }
+
+            return receipts.map(receipt => {
+                const partsRows = receipt.parts.map(part => `
+                    <tr>
+                        <td>${part.partName || '-'}</td>
+                        <td>${part.partCode || '-'}</td>
+                        <td>${part.zone || '-'}</td>
+                        <td>${part.inspectionResult || '-'}</td>
+                        <td>${part.graceDays || '-'}</td>
+                    </tr>
+                `).join('');
+
+                return `
+                    <div class="event-item">
+                        <div class="event-header">접수번호: ${receipt.receiptNumber}</div>
+                        <div class="event-meta">
+                            점검일: ${formatDate(receipt.inspectionDate)} |
+                            처리자: ${receipt.processor || '-'} |
+                            칸구분: ${receipt.zone || '-'}
+                        </div>
+                        ${receipt.receiptContent ? `<div style="margin-bottom: 8px; font-size: 0.9rem;"><strong>접수내용:</strong> ${receipt.receiptContent}</div>` : ''}
+
+                        <div class="table-scroll">
+                        <table class="parts-table">
+                            <thead>
+                                <tr>
+                                    <th>부품명</th>
+                                    <th>부품코드</th>
+                                    <th>칸구분</th>
+                                    <th>점검결과</th>
+                                    <th>점검유예(일)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${partsRows}
+                            </tbody>
+                        </table>
+                        </div>
+
+                        ${receipt.processContent ? `<div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); font-size: 0.9rem;"><strong>처리내용:</strong> ${receipt.processContent}</div>` : ''}
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // 점검 부품별 뷰 렌더링
+        function renderInspectionPartView(parts) {
+            if (parts.length === 0) {
+                return '<div class="empty-message">점검 내역이 없습니다.</div>';
+            }
+
+            return parts.map(part => {
+                const eventsRows = part.events.map(event => `
+                    <tr>
+                        <td>${formatDate(event.inspectionDate)}</td>
+                        <td>${event.inspectionResult || '-'}</td>
+                        <td>${event.graceDays || '-'}</td>
+                        <td>${event.processor || '-'}</td>
+                        <td>${event.receiptNumber || '-'}</td>
+                        <td>${event.zone || '-'}</td>
+                    </tr>
+                `).join('');
+
+                return `
+                    <div class="event-item">
+                        <div class="event-header">${part.partName} (${part.partCode})</div>
+
+                        <div class="table-scroll">
+                        <table class="parts-table">
+                            <thead>
+                                <tr>
+                                    <th>점검일</th>
+                                    <th>점검결과</th>
+                                    <th>점검유예(일)</th>
+                                    <th>처리자</th>
+                                    <th>접수번호</th>
+                                    <th>칸구분</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${eventsRows}
+                            </tbody>
+                        </table>
+                        </div>
+
+                        ${part.events[0]?.receiptContent ? `<div style="margin-top: 12px; font-size: 0.9rem;"><strong>접수내용:</strong> ${part.events[0].receiptContent}</div>` : ''}
+                        ${part.events[0]?.processContent ? `<div style="margin-top: 8px; font-size: 0.9rem;"><strong>처리내용:</strong> ${part.events[0].processContent}</div>` : ''}
+                    </div>
+                `;
+            }).join('');
+        }
+
         // 수리/교체 내역 초기 렌더링
         function renderRepairHistory() {
             if (!currentProduct) {
@@ -2383,6 +2856,25 @@
             document.getElementById('sub-tab-receipt').innerHTML = renderReceiptView(receiptGroups);
             document.getElementById('sub-tab-part').innerHTML = renderPartView(partGroups);
             console.log('렌더링 완료');
+        }
+
+        // 점검 내역 초기 렌더링
+        function renderInspectionHistory() {
+            if (!currentProduct) {
+                console.log('renderInspectionHistory: currentProduct가 없습니다');
+                return;
+            }
+
+            const mgrNumber = currentProduct.mgr;
+
+            console.log('=== renderInspectionHistory 호출 ===');
+            console.log('관리번호:', mgrNumber);
+
+            const receiptGroups = groupInspectionsByReceipt(mgrNumber);
+            const partGroups = groupInspectionsByPart(mgrNumber);
+
+            document.getElementById('sub-tab-inspection-receipt').innerHTML = renderInspectionReceiptView(receiptGroups);
+            document.getElementById('sub-tab-inspection-part').innerHTML = renderInspectionPartView(partGroups);
         }
 
 
